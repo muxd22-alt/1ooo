@@ -23,18 +23,20 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          code=$(curl -s -o pages-patch.json -w '%{http_code}' -X PATCH \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
+          hdr=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          get_bt() { curl -s "${hdr[@]}" "https://api.github.com/repos/$GITHUB_REPOSITORY/pages" | jq -r '.build_type // empty'; }
+          current=$(get_bt)
+          echo "current build_type: ${current:-<unreadable>}"
+          if [ "$current" = "workflow" ]; then echo "already workflow mode"; exit 0; fi
+          code=$(curl -s -o pages-patch.json -w '%{http_code}' -X PATCH "${hdr[@]}" \
             "https://api.github.com/repos/$GITHUB_REPOSITORY/pages" \
             -d '{"build_type":"workflow"}')
           echo "PATCH pages build_type=workflow -> HTTP $code"
-          cat pages-patch.json
-          if [ "$code" != "200" ]; then
-            echo "::error title=GitHub Pages source is wrong::Could not switch Pages to 'GitHub Actions' mode via API (HTTP $code). The site will keep serving raw repo files. Fix manually: repo Settings -> Pages -> Build and deployment -> Source -> GitHub Actions."
-            exit 1
-          fi
+          cat pages-patch.json; echo
+          if [ "$code" = "200" ]; then echo "switched to workflow mode"; exit 0; fi
+          if [ "$(get_bt)" = "workflow" ]; then echo "already workflow mode"; exit 0; fi
+          echo "::error title=GitHub Pages source is wrong::Pages is set to serve raw repo files (build_type=${current:-unknown}) and the API cannot switch it (HTTP $code, needs repo admin). Fix: github.com/$GITHUB_REPOSITORY/settings/pages -> Build and deployment -> Source -> GitHub Actions, then re-run this workflow. Until then the site serves unbundled source and will not boot."
+          exit 1
       - uses: actions/setup-node@v4
         with:
           node-version: 22
