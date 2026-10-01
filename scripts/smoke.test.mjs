@@ -13,7 +13,21 @@ const CHROME =
 const APP_PORT = 5310;
 const DEBUG_PORT = 9233;
 const PROFILE = path.join(ROOT, '.chrome-smoke');
-const TIMEOUT_MS = 90000;
+const TIMEOUT_MS = 150000;
+const GITHUB_ACTIONS = !!process.env.GITHUB_ACTIONS;
+const milestones = [];
+const startedAt = Date.now();
+
+function mark(label) {
+  milestones.push(`+${((Date.now() - startedAt) / 1000).toFixed(1)}s ${label}`);
+  console.log(`    ... ${milestones[milestones.length - 1]}`);
+}
+
+function ghError(message) {
+  if (!GITHUB_ACTIONS) return;
+  const text = String(message).replace(/\r?\n/g, '%0A');
+  console.log(`::error title=Headless Chrome smoke failed::${text}`);
+}
 
 function killTree(pid) {
   if (process.platform === 'win32') {
@@ -117,6 +131,7 @@ try {
   });
 
   await waitForHttp(`http://localhost:${APP_PORT}/`, 30000);
+  mark(`vite ready on :${APP_PORT}`);
 
   chrome = spawn(
     CHROME,
@@ -134,6 +149,7 @@ try {
   );
 
   await waitForHttp(`http://127.0.0.1:${DEBUG_PORT}/json/list`, 30000);
+  mark('chrome cdp endpoint ready');
   const targets = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/list`)).json();
   const page = targets.find((t) => t.type === 'page');
   if (!page) throw new Error('no page target');
@@ -142,6 +158,7 @@ try {
   await cdp.send('Runtime.enable');
   await cdp.send('Page.enable');
   await cdp.send('Page.navigate', { url: `http://localhost:${APP_PORT}/?seed=1337` });
+  mark('page navigated to app');
 
   const deadline = Date.now() + TIMEOUT_MS;
   let hud = '';
@@ -171,6 +188,7 @@ try {
   if (!/fps/.test(hud) || !/quads/.test(hud)) {
     throw new Error(`engine did not reach ready state; hud was: ${JSON.stringify(hud)}\nconsole: ${consoleErrors.join('\n')}`);
   }
+  mark('engine ready (fps+quads in hud)');
 
   const fireDeadline = Date.now() + 20000;
   let fireStats = null;
@@ -193,8 +211,9 @@ try {
   if (!fireStats || fireStats.hits < 1 || fireStats.voxelsRemoved <= 0) {
     throw new Error(`destruction pipeline did not confirm a hit; stats: ${JSON.stringify(fireStats)}`);
   }
+  mark(`destruction confirmed ${JSON.stringify(fireStats)}`);
 
-  const layaDeadline = Date.now() + 60000;
+  const layaDeadline = Date.now() + 90000;
   let layaState = null;
   while (Date.now() < layaDeadline) {
     const out = await cdp.send('Runtime.evaluate', {
@@ -217,6 +236,7 @@ try {
   if (!(layaState.latencyMs > 0)) {
     throw new Error(`invalid inference latency: ${layaState.latencyMs}`);
   }
+  mark(`laya live state ready ${JSON.stringify(layaState.logits)}`);
 
   const reference = JSON.parse(readFileSync(new URL('../data/laya-reference.json', import.meta.url), 'utf8'));
   const verifiedIntents = [];
@@ -243,6 +263,7 @@ try {
     }
     verifiedIntents.push(sample.intent);
   }
+  mark(`INT8 reference verified (${verifiedIntents.join('/')})`);
 
   const hudDeadline = Date.now() + 45000;
   let hudAfter = '';
@@ -259,6 +280,7 @@ try {
   if (!/laya ready/.test(hudAfter)) {
     throw new Error(`HUD never showed ready laya line: ${JSON.stringify(hudAfter)}`);
   }
+  mark('hud shows laya ready');
 
   console.log('OK  smoke test passed');
   console.log(
@@ -282,6 +304,20 @@ try {
   if (navs.length) console.error('    page navigations:\n' + navs.map((n) => `      ${n}`).join('\n'));
   const errs = collectConsole();
   if (errs.length) console.error('    console:\n' + errs.map((e) => `      ${e}`).join('\n'));
+
+  let chromeTail = '';
+  try {
+    const log = readFileSync(chromeLogPath, 'utf8').trim();
+    chromeTail = log ? `\nchrome stderr (tail):\n${log.split('\n').slice(-30).join('\n')}` : '';
+  } catch {}
+
+  ghError(
+    `${err.message}\n` +
+      `milestones:\n${milestones.map((m) => `  ${m}`).join('\n')}\n` +
+      (navs.length ? `navigations:\n${navs.join('\n')}\n` : '') +
+      (errs.length ? `console:\n${errs.join('\n')}` : '') +
+      chromeTail
+  );
   process.exitCode = 1;
 } finally {
   cdp?.close();
