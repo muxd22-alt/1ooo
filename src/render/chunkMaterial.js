@@ -1,5 +1,5 @@
 import { MeshStandardNodeMaterial } from 'three/webgpu';
-import { attribute, clamp, float, mix, positionWorld, vec3 } from 'three/tsl';
+import { attribute, clamp, float, mix, positionWorld, uniform, vec3 } from 'three/tsl';
 import { CHUNK } from '../world/blocks.js';
 
 export function createChunkMaterial() {
@@ -11,5 +11,8 @@ export function createChunkMaterial() {
 
   material.colorNode = albedo.mul(skyTint);
 
-  return material;
+  const nightGlow = uniform(0.15);
+  material.emissiveNode = attribute('emissive', 'vec3').mul(nightGlow);
+
+  return { material, nightGlow };
 }

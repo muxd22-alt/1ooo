@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node scripts/mesher.test.mjs && node scripts/voxelops.test.mjs && node scripts/weapon.test.mjs && node scripts/telemetry.test.mjs",
+    "test": "node scripts/mesher.test.mjs && node scripts/city.test.mjs && node scripts/voxelops.test.mjs && node scripts/weapon.test.mjs && node scripts/telemetry.test.mjs",
     "smoke": "node scripts/smoke.test.mjs",
     "diag": "node scripts/diag-webgl.mjs",
     "gen:model": "python scripts/gen_laya_model.py"

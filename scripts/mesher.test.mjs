@@ -105,7 +105,12 @@ for (let i = 0; i < mesh.positions.length; i++) {
 assert(mesh.positions.length === mesh.verts * 3, 'position count matches verts');
 assert(mesh.normals.length === mesh.verts * 3, 'normal count matches verts');
 assert(mesh.colors.length === mesh.verts * 3, 'color count matches verts');
+assert(mesh.emissives.length === mesh.verts * 3, 'emissive count matches verts');
 assert(mesh.indices.length % 6 === 0, 'indices form complete quads');
+
+for (let i = 0; i < mesh.emissives.length; i++) {
+  assert(Number.isFinite(mesh.emissives[i]), `non-finite emissive at ${i}`);
+}
 
 for (let i = 0; i < mesh.indices.length; i += 6) {
   const a = mesh.indices[i];

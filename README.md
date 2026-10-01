@@ -14,11 +14,13 @@ Live build: https://muxd22-alt.github.io/1ooo/
 
 ## Key Features
 
+* **Procedural City World:** A seeded `400 x 64 x 300` city assembled from **12 chunk templates** (100³ voxels each) that mix-and-match per seed — road grid, sidewalks, buildings, fences, parks, plazas, parking lots and markets. Road corridors are placed from world-space coordinates, so every chunk seam connects mathematically for any seed (verified by `scripts/city.test.mjs`).
+* **Day/Night Cycle & Street Lights:** A 3-minute sunrise→noon→dusk→midnight cycle drives sun/moon position, sky, fog and a TSL `nightGlow` uniform — lamp posts, neon signs and glass windows are emissive voxel materials that light up the city after dark (`?phase=0.75` starts at midnight).
 * **WebGPU Voxel Renderer & Worker Greedy Mesher:** Offloads chunk mesh generation to non-blocking Web Workers using greedy meshing, combined with Three Shader Language (TSL) node materials. Automatic WebGL2 fallback when no WebGPU adapter is available.
-* **CSG Voxel Destruction:** Real-time spherical voxel subtraction (`subtractSphere`) driven by DDA raycasting — shots carve craters into the world and re-mesh the chunk in the worker.
+* **CSG Voxel Destruction:** Real-time spherical voxel subtraction (`subtractSphere`) driven by DDA raycasting over the full world — shots carve craters and re-mesh only the affected chunks in the worker.
 * **Modular Gunsmith System:** 4-slot weapon assembly framework (Receiver, Barrel, Grip, Magazine) with deterministic attribute aggregation, weight clamping, and recoil impulse vector scaling. 10 parts, 28/36 valid assemblies, JSON-Schema validated.
 * **Laya ONNX Edge AI (Web Worker):** Executes a quantized INT8 neural network (`onnxruntime-web` over WASM) off-thread to analyze 10 Hz player telemetry vectors (aim sigma, APM, movement variance) into tactical logits — AGGRESSIVE / HARVESTER / CAMPER — driving atmosphere and director state.
-* **Deterministic Seeding:** Chunk generation is seeded (`?seed=1337` or `R` to reseed) and reproducible across client and CI (reference-tested mesher output).
+* **Deterministic Seeding:** City generation is seeded (`?seed=1337` or `R` to reseed) and reproducible across client and CI (reference-tested mesher output).
 
 ---
 
@@ -29,10 +31,10 @@ Live build: https://muxd22-alt.github.io/1ooo/
 │                        Browser Client                        │
 ├────────────────────┬─────────────────────┬───────────────────┤
 │  WebGPU Renderer   │  Mesher Worker      │  Laya AI Worker   │
-│  • three/webgpu    │  • terrain gen      │  • INT8 ONNX      │
+│  • three/webgpu    │  • city gen (12x)   │  • INT8 ONNX      │
 │  • TSL material    │  • greedy meshing   │  • 10 Hz telemetry│
 │  • WebGL2 fallback │  • DDA raycast +    │  • intent logits  │
-│                    │    subtractSphere   │    → atmosphere   │
+│  • day/night cycle │    subtractSphere   │    → atmosphere   │
 └────────────────────┴─────────────────────┴───────────────────┘
               ▲ build/shoot msgs          ▲ INFER_TELEMETRY
               │ BufferGeometry replies    │ INTENT_RESULT
@@ -51,7 +53,7 @@ All heavy work runs off the main thread: chunk meshing and CSG destruction in on
 | :--- | :--- | :--- |
 | **Graphics** | `Three.js r186` / `WebGPURenderer` | WebGPU rendering pipeline with TSL materials, WebGL2 fallback. |
 | **Build System** | `Vite 8` | ESM bundling, module workers, COOP/COEP headers for isolated WASM threads. |
-| **Meshing** | `Web Workers` | Parallelized greedy meshing for `100 x 64 x 100` voxel chunks (~4.5x face compression). |
+| **Meshing** | `Web Workers` | Parallelized greedy meshing for `100 x 64 x 100` voxel chunks (~4.5x face compression), 12-chunk world with per-vertex emissive attributes. |
 | **Edge AI** | `onnxruntime-web` | Quantized (INT8) ONNX session running over WASM in a dedicated worker. |
 | **Testing** | `Node scripts` + `CDP` | Unit tests (mesher/voxelops/weapon/telemetry) and Chrome DevTools Protocol smoke testing. |
 | **Deployment** | `GitHub Actions` → `GitHub Pages` | CI runs test + smoke + build on every push; Pages deploys `dist/` automatically. |
@@ -88,7 +90,7 @@ Visit `http://localhost:5173` in your browser.
 Run the test suite to verify unit logic, weapon math, and headless browser navigation:
 
 ```bash
-# Run unit tests (mesher, voxel destruction, weapon aggregation, telemetry/director)
+# Run unit tests (mesher, city, voxel destruction, weapon aggregation, telemetry/director)
 npm test
 
 # Run CDP headless Chrome smoke test (CDP port 9233 / app port 5310)
@@ -155,7 +157,7 @@ Aggregation rules: damage = flat sum x scalar product; RPM/weight/recoil/radius 
 - [x] **Phase 1: Renderer & Meshing** — WebGPU render loop, Web Worker greedy meshing, DDA voxel destruction.
 - [x] **Phase 2: Gunsmith & Edge AI** — 4-slot weapon aggregation, Laya ONNX worker pipeline, HUD telemetry.
 - [x] **Phase 3: CI & Deployment** — GitHub Actions (test + smoke + build) and GitHub Pages auto-deploy.
-- [ ] **Phase 4: WFC & Networking** — 10-chunk 2D Wave Function Collapse stitching & binary delta sync.
+- [x] **Phase 4: City World** — 12-chunk seeded city (road grid mathematically connected across seams), 12 district templates, day/night cycle with emissive street lights.
 - [ ] **Phase 5: Physics & Colliders** — Rapier3D trimesh/compound-cuboid colliders derived from worker mesher output (rebuilt per re-mesh, not per shot).
 
 ---

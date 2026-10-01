@@ -1,6 +1,7 @@
-import { BLOCK_PALETTE } from './blocks.js';
+import { BLOCK_EMISSIVE, BLOCK_PALETTE } from './blocks.js';
 
 const PALETTE_FALLBACK = [1, 0, 1];
+const NO_EMISSIVE = [0, 0, 0];
 
 /**
  * Greedy mesher over a dense voxel volume.
@@ -12,7 +13,8 @@ const PALETTE_FALLBACK = [1, 0, 1];
  *   0   -> no face
  *
  * @returns {{positions: Float32Array, normals: Float32Array,
- *            colors: Float32Array, indices: Uint32Array,
+ *            colors: Float32Array, emissives: Float32Array,
+ *            indices: Uint32Array,
  *            quads: number, verts: number, faces: number}}
  */
 export function greedyMesh(voxels, sx, sy, sz) {
@@ -20,6 +22,7 @@ export function greedyMesh(voxels, sx, sy, sz) {
   const positions = [];
   const normals = [];
   const colors = [];
+  const emissives = [];
   const indices = [];
 
   let vertCount = 0;
@@ -90,7 +93,9 @@ export function greedyMesh(voxels, sx, sy, sz) {
   }
 
   function emitQuad(d, u, v, plane, a, b, w, h, m) {
-    const mat = BLOCK_PALETTE[Math.abs(m)] || PALETTE_FALLBACK;
+    const matId = Math.abs(m);
+    const mat = BLOCK_PALETTE[matId] || PALETTE_FALLBACK;
+    const em = BLOCK_EMISSIVE[matId] || NO_EMISSIVE;
     const dir = m > 0 ? 1 : -1;
 
     const base = [0, 0, 0];
@@ -113,6 +118,7 @@ export function greedyMesh(voxels, sx, sy, sz) {
     for (let k = 0; k < 4; k++) normals.push(n[0], n[1], n[2]);
 
     for (let k = 0; k < 4; k++) colors.push(mat[0], mat[1], mat[2]);
+    for (let k = 0; k < 4; k++) emissives.push(em[0], em[1], em[2]);
 
     const o = vertCount;
     if (dir > 0) indices.push(o, o + 1, o + 2, o, o + 2, o + 3);
@@ -124,6 +130,7 @@ export function greedyMesh(voxels, sx, sy, sz) {
     positions: new Float32Array(positions),
     normals: new Float32Array(normals),
     colors: new Float32Array(colors),
+    emissives: new Float32Array(emissives),
     indices: new Uint32Array(indices),
     quads: indices.length / 6,
     verts: vertCount,
