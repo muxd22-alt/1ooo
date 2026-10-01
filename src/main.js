@@ -4,6 +4,18 @@ import { CHUNK } from './world/blocks.js';
 import { createChunkMaterial } from './render/chunkMaterial.js';
 import { FlyControls } from './player/flyControls.js';
 import { loadPreset } from './game/weapons/loadout.js';
+import {
+  TELEMETRY_INTERVAL_MS,
+  createTelemetryState,
+  pushAimSample,
+  pushPosition,
+  noteAction,
+  noteShot,
+  accrueCombatTime,
+  buildFeatureVector,
+  resetWindow
+} from './ai/telemetry.js';
+import { intentFromLogits, directorState } from './ai/director.js';
 
 const canvas = document.getElementById('view');
 const hudStats = document.getElementById('hud-stats');
@@ -71,7 +83,8 @@ camera.rotation.order = 'YXZ';
 const sun = new THREE.DirectionalLight(0xfff2df, 3.0);
 sun.position.set(80, 120, 40);
 scene.add(sun);
-scene.add(new THREE.HemisphereLight(0xcfe2ff, 0x6a5a44, 1.4));
+const hemiLight = new THREE.HemisphereLight(0xcfe2ff, 0x6a5a44, 1.4);
+scene.add(hemiLight);
 
 const chunkMaterial = createChunkMaterial();
 
@@ -118,7 +131,7 @@ worker.onmessage = (event) => {
 
   if (msg.reason === 'build') camera.position.set(msg.spawn.x, msg.spawn.y, msg.spawn.z);
 
-  lastBuild = { seed: msg.seed, ...msg.stats };
+  lastBuild = { seed: msg.seed, genMs: lastBuild?.genMs ?? 0, ...msg.stats };
 };
 
 worker.onerror = (err) => {
@@ -128,10 +141,68 @@ worker.onerror = (err) => {
 
 const controls = new FlyControls(camera, canvas);
 
+const telemetry = createTelemetryState();
+const laya = {
+  ready: false,
+  error: null,
+  logits: [0, 0, 0],
+  intent: 'HARVESTER',
+  margin: 0,
+  latencyMs: 0,
+  inferCount: 0,
+  target: directorState('HARVESTER')
+};
+let samplingPaused = false;
+
+const layaWorker = new Worker(new URL('./ai/laya-worker.js', import.meta.url), { type: 'module' });
+layaWorker.postMessage({
+  type: 'INIT',
+  payload: { modelUrl: new URL('models/laya_tactical_int8.onnx', document.baseURI).href }
+});
+
+layaWorker.onmessage = (event) => {
+  const msg = event.data;
+  if (msg.type === 'READY') {
+    laya.ready = true;
+  } else if (msg.type === 'ERROR') {
+    laya.error = msg.error;
+    console.warn('laya:', msg.error);
+  } else if (msg.type === 'INTENT_RESULT') {
+    laya.inferCount++;
+    laya.logits = msg.logits;
+    laya.latencyMs = msg.latencyMs;
+    const intent = intentFromLogits(msg.logits);
+    if (intent) {
+      laya.intent = intent.name;
+      laya.margin = intent.margin;
+      laya.target = directorState(intent.name);
+    }
+  }
+};
+
+let lastTelemetryAt = performance.now();
+setInterval(() => {
+  const now = performance.now();
+  const dt = now - lastTelemetryAt;
+  lastTelemetryAt = now;
+  if (samplingPaused) return;
+  accrueCombatTime(telemetry, now, dt);
+  pushPosition(telemetry, camera.position);
+  const features = buildFeatureVector(telemetry, camera.position.y / CHUNK.y);
+  layaWorker.postMessage(
+    { type: 'INFER_TELEMETRY', payload: { telemetryBuffer: features.buffer } },
+    [features.buffer]
+  );
+  resetWindow(telemetry);
+}, TELEMETRY_INTERVAL_MS);
+
+controls.onAim = (dx, dy) => pushAimSample(telemetry, dx, dy);
+
 function shoot(now) {
   if (!chunkMesh || now - lastShotAt < weapon.fireIntervalMs) return;
   lastShotAt = now;
   shots++;
+  noteShot(telemetry, now);
 
   const origin = camera.position;
   const dir = camera.getWorldDirection(new THREE.Vector3());
@@ -159,7 +230,36 @@ document.addEventListener('mousedown', (event) => {
 window.__engine = {
   shoot: () => shoot(performance.now()),
   stats: () => ({ shots, hits, voxelsRemoved, quads: lastBuild?.quads ?? 0 }),
-  weapon: () => weapon
+  weapon: () => weapon,
+  laya: () => ({
+    ready: laya.ready,
+    error: laya.error,
+    intent: laya.intent,
+    logits: laya.logits,
+    latencyMs: laya.latencyMs,
+    inferCount: laya.inferCount
+  }),
+  inferSample: async (features) => {
+    samplingPaused = true;
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const buffer = new Float32Array(features).buffer;
+      const result = await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('inferSample timeout')), 10000);
+        const handler = (event) => {
+          if (event.data.type !== 'INTENT_RESULT') return;
+          clearTimeout(timer);
+          layaWorker.removeEventListener('message', handler);
+          resolve(event.data);
+        };
+        layaWorker.addEventListener('message', handler);
+        layaWorker.postMessage({ type: 'INFER_TELEMETRY', payload: { telemetryBuffer: buffer } }, [buffer]);
+      });
+      return { logits: result.logits, latencyMs: result.latencyMs };
+    } finally {
+      samplingPaused = false;
+    }
+  }
 };
 
 window.addEventListener('resize', () => {
@@ -173,6 +273,7 @@ window.addEventListener('keydown', (event) => {
     shots = 0;
     hits = 0;
     voxelsRemoved = 0;
+    noteAction(telemetry);
     requestBuild((Math.random() * 0xffffffff) >>> 0);
     return;
   }
@@ -180,12 +281,24 @@ window.addEventListener('keydown', (event) => {
   if (presetIndex >= 1 && presetIndex <= 3) {
     weapon = loadPreset(presetIndex);
     lastShotAt = -Infinity;
+    noteAction(telemetry);
   }
 });
 
 let fps = 60;
 let lastFrame = performance.now();
 let lastHud = 0;
+const atmoColor = new THREE.Color();
+
+function applyAtmosphere(dt) {
+  const t = 1 - Math.exp(-1.6 * dt);
+  const target = laya.target;
+  scene.fog.density += (target.fog - scene.fog.density) * t;
+  scene.fog.color.lerp(atmoColor.setHex(target.sky), t);
+  skyColor.lerp(atmoColor.setHex(target.sky), t);
+  sun.intensity += (target.sun - sun.intensity) * t;
+  hemiLight.intensity += (target.hemi - hemiLight.intensity) * t;
+}
 
 renderer.setAnimationLoop((now) => {
   const dt = Math.min(0.1, (now - lastFrame) / 1000);
@@ -193,6 +306,7 @@ renderer.setAnimationLoop((now) => {
   if (dt > 0) fps += (1 / dt - fps) * 0.08;
 
   controls.update(dt);
+  applyAtmosphere(dt);
   renderer.render(scene, camera);
 
   if (now - lastHud > 200) {
@@ -207,8 +321,13 @@ renderer.setAnimationLoop((now) => {
       `recoil V${weapon.recoil.vertical.toFixed(2)}/H${weapon.recoil.horizontal.toFixed(2)} · ` +
       `weight ${weapon.weight.toFixed(1)}kg · r ${weapon.voxelDestructionRadius.toFixed(2)}m\n` +
       `shots ${shots}/${hits} · voxels removed ${voxelsRemoved.toLocaleString()}`;
+    const ai = laya.error
+      ? `laya ERROR: ${laya.error}`
+      : `laya ${laya.ready ? 'ready' : 'loading…'} · intent ${laya.intent} · margin ${laya.margin.toFixed(2)} · ` +
+        `${laya.latencyMs.toFixed(1)}ms · ${laya.inferCount} inferences`;
     hudStats.textContent =
-      `${backendName} · ${fps.toFixed(0)} fps · chunk ${CHUNK.x}x${CHUNK.y}x${CHUNK.z}\n${build}\n${gun}`;
+      `${backendName} · ${fps.toFixed(0)} fps · chunk ${CHUNK.x}x${CHUNK.y}x${CHUNK.z}\n` +
+      `${build}\n${gun}\n${ai}`;
   }
 });
 

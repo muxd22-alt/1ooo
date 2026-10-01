@@ -13,6 +13,7 @@ export class FlyControls {
     this.yaw = 0;
     this.pitch = -0.25;
     this.locked = false;
+    this.onAim = null;
 
     this._forward = new Vector3();
     this._right = new Vector3();
@@ -24,6 +25,7 @@ export class FlyControls {
       this.yaw -= event.movementX * SENSITIVITY;
       this.pitch -= event.movementY * SENSITIVITY;
       this.pitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, this.pitch));
+      if (this.onAim) this.onAim(event.movementX, event.movementY);
     };
 
     this._onKeyDown = (event) => {

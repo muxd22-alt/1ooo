@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .chrome-*/
+.chrome-smoke.log
 dom*.html
 vite.pid
 .DS_Store

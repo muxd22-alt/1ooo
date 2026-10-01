@@ -1,0 +1,88 @@
+{
+  "model": "models/laya_tactical_int8.onnx",
+  "inputName": "telemetry_input",
+  "outputName": "action_logits",
+  "features": [
+    "sigma_aim",
+    "apm",
+    "var_v",
+    "tau_mine_ratio",
+    "elev_bias",
+    "crouch_freq"
+  ],
+  "intents": [
+    "AGGRESSIVE",
+    "HARVESTER",
+    "CAMPER"
+  ],
+  "seed": 1337,
+  "hidden": 16,
+  "opset": 13,
+  "tolerance": 0.05,
+  "samples": [
+    {
+      "features": [
+        3.5,
+        120.0,
+        1.8,
+        0.2,
+        0.4,
+        0.0
+      ],
+      "logits": [
+        26.062450408935547,
+        -14.720884323120117,
+        -6.852912425994873
+      ],
+      "intent": "AGGRESSIVE"
+    },
+    {
+      "features": [
+        0.4,
+        15.0,
+        0.3,
+        4.0,
+        0.3,
+        0.0
+      ],
+      "logits": [
+        2.248033046722412,
+        4.161345958709717,
+        -1.7989990711212158
+      ],
+      "intent": "HARVESTER"
+    },
+    {
+      "features": [
+        0.2,
+        4.0,
+        0.05,
+        0.1,
+        0.9,
+        0.0
+      ],
+      "logits": [
+        0.9284107089042664,
+        -0.5421057343482971,
+        1.0765444040298462
+      ],
+      "intent": "CAMPER"
+    },
+    {
+      "features": [
+        1.0,
+        50.0,
+        0.8,
+        1.0,
+        0.5,
+        0.0
+      ],
+      "logits": [
+        9.851606369018555,
+        -4.577376365661621,
+        -2.425131320953369
+      ],
+      "intent": "AGGRESSIVE"
+    }
+  ]
+}
