@@ -1,0 +1,152 @@
+[
+  {
+    "partId": "part_receiver_ar01",
+    "slotType": "receiver",
+    "weightClass": 2.4,
+    "compatibilityTags": ["platform_ar", "standard"],
+    "baseAttributes": { "thermalMass": 42, "durability": 90 },
+    "statModifiers": {
+      "damageFlat": 8,
+      "damageScalar": 1.0,
+      "fireRateRPM": 700,
+      "recoilImpulseVertical": 0.9,
+      "recoilImpulseHorizontal": 0.35,
+      "voxelDestructionRadius": 0.9
+    }
+  },
+  {
+    "partId": "part_receiver_smg01",
+    "slotType": "receiver",
+    "weightClass": 1.6,
+    "compatibilityTags": ["platform_smg", "standard"],
+    "baseAttributes": { "thermalMass": 30, "durability": 75 },
+    "statModifiers": {
+      "damageFlat": 5,
+      "damageScalar": 1.0,
+      "fireRateRPM": 950,
+      "recoilImpulseVertical": 0.6,
+      "recoilImpulseHorizontal": 0.5,
+      "voxelDestructionRadius": 0.6
+    }
+  },
+  {
+    "partId": "part_receiver_dmr01",
+    "slotType": "receiver",
+    "weightClass": 3.0,
+    "compatibilityTags": ["platform_dmr", "standard"],
+    "baseAttributes": { "thermalMass": 55, "durability": 95 },
+    "statModifiers": {
+      "damageFlat": 22,
+      "damageScalar": 1.0,
+      "fireRateRPM": 240,
+      "recoilImpulseVertical": 1.8,
+      "recoilImpulseHorizontal": 0.4,
+      "voxelDestructionRadius": 1.6
+    }
+  },
+  {
+    "partId": "part_barrel_short",
+    "slotType": "barrel",
+    "weightClass": 0.9,
+    "compatibilityTags": ["platform_ar", "platform_smg"],
+    "baseAttributes": { "thermalMass": 18, "durability": 70 },
+    "statModifiers": {
+      "damageFlat": 2,
+      "damageScalar": 1.05,
+      "fireRateRPM": 40,
+      "recoilImpulseVertical": 0.1,
+      "recoilImpulseHorizontal": 0.15,
+      "voxelDestructionRadius": 0.1
+    }
+  },
+  {
+    "partId": "part_barrel_long",
+    "slotType": "barrel",
+    "weightClass": 1.8,
+    "compatibilityTags": ["platform_ar", "platform_dmr"],
+    "baseAttributes": { "thermalMass": 36, "durability": 88 },
+    "statModifiers": {
+      "damageFlat": 6,
+      "damageScalar": 1.15,
+      "fireRateRPM": -30,
+      "recoilImpulseVertical": -0.15,
+      "recoilImpulseHorizontal": -0.05,
+      "voxelDestructionRadius": 0.3
+    }
+  },
+  {
+    "partId": "part_barrel_heavy",
+    "slotType": "barrel",
+    "weightClass": 3.2,
+    "compatibilityTags": ["platform_ar", "platform_dmr", "platform_smg"],
+    "baseAttributes": { "thermalMass": 60, "durability": 92 },
+    "statModifiers": {
+      "damageFlat": 4,
+      "damageScalar": 1.25,
+      "fireRateRPM": -60,
+      "recoilImpulseVertical": 0.05,
+      "recoilImpulseHorizontal": 0.0,
+      "voxelDestructionRadius": 0.5
+    }
+  },
+  {
+    "partId": "part_grip_vertical",
+    "slotType": "grip",
+    "weightClass": 0.4,
+    "compatibilityTags": ["platform_ar", "platform_smg", "platform_dmr"],
+    "baseAttributes": { "thermalMass": 8, "durability": 80 },
+    "statModifiers": {
+      "damageFlat": 0,
+      "damageScalar": 1.0,
+      "fireRateRPM": 20,
+      "recoilImpulseVertical": -0.35,
+      "recoilImpulseHorizontal": -0.1,
+      "voxelDestructionRadius": 0.0
+    }
+  },
+  {
+    "partId": "part_grip_angled",
+    "slotType": "grip",
+    "weightClass": 0.3,
+    "compatibilityTags": ["platform_ar", "platform_smg", "platform_dmr"],
+    "baseAttributes": { "thermalMass": 7, "durability": 76 },
+    "statModifiers": {
+      "damageFlat": 0,
+      "damageScalar": 1.0,
+      "fireRateRPM": 35,
+      "recoilImpulseVertical": -0.15,
+      "recoilImpulseHorizontal": -0.3,
+      "voxelDestructionRadius": 0.0
+    }
+  },
+  {
+    "partId": "part_mag_std20",
+    "slotType": "magazine",
+    "weightClass": 0.7,
+    "compatibilityTags": ["platform_ar", "platform_smg", "platform_dmr"],
+    "baseAttributes": { "thermalMass": 10, "durability": 85 },
+    "statModifiers": {
+      "damageFlat": 0,
+      "damageScalar": 1.0,
+      "fireRateRPM": 0,
+      "recoilImpulseVertical": 0.0,
+      "recoilImpulseHorizontal": 0.0,
+      "voxelDestructionRadius": 0.0
+    }
+  },
+  {
+    "partId": "part_mag_ext40",
+    "slotType": "magazine",
+    "weightClass": 1.5,
+    "compatibilityTags": ["platform_ar", "platform_smg", "platform_dmr"],
+    "baseAttributes": { "thermalMass": 16, "durability": 82 },
+    "statModifiers": {
+      "damageFlat": 1,
+      "damageScalar": 1.02,
+      "fireRateRPM": 15,
+      "recoilImpulseVertical": 0.1,
+      "recoilImpulseHorizontal": 0.05,
+      "voxelDestructionRadius": 0.0
+    }
+  }
+]

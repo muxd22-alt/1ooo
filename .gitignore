@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.chrome-*/
+dom*.html
+vite.pid
+.DS_Store
+*.log

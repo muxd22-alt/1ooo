@@ -1,0 +1,20 @@
+{
+  "name": "1ooo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser-based hybrid voxel-action engine - Phase 1 micro-starter",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node scripts/mesher.test.mjs && node scripts/voxelops.test.mjs && node scripts/weapon.test.mjs",
+    "smoke": "node scripts/smoke.test.mjs"
+  },
+  "dependencies": {
+    "three": "0.186.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.2"
+  }
+}

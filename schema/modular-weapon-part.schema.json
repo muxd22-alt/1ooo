@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ModularWeaponPartSchema",
+  "type": "object",
+  "required": ["partId", "slotType", "compatibilityTags", "baseAttributes", "statModifiers"],
+  "properties": {
+    "partId": {
+      "type": "string",
+      "pattern": "^part_[a-z0-9_]+$"
+    },
+    "slotType": {
+      "type": "string",
+      "enum": ["receiver", "barrel", "grip", "magazine"]
+    },
+    "weightClass": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 20.0
+    },
+    "compatibilityTags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "baseAttributes": {
+      "type": "object",
+      "required": ["thermalMass", "durability"],
+      "properties": {
+        "thermalMass": { "type": "number", "minimum": 0 },
+        "durability": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "statModifiers": {
+      "type": "object",
+      "required": [
+        "damageFlat",
+        "damageScalar",
+        "fireRateRPM",
+        "recoilImpulseVertical",
+        "recoilImpulseHorizontal",
+        "voxelDestructionRadius"
+      ],
+      "properties": {
+        "damageFlat": { "type": "number" },
+        "damageScalar": { "type": "number", "default": 1.0 },
+        "fireRateRPM": { "type": "number" },
+        "recoilImpulseVertical": { "type": "number" },
+        "recoilImpulseHorizontal": { "type": "number" },
+        "voxelDestructionRadius": { "type": "number", "minimum": 0.0 }
+      }
+    }
+  }
+}
