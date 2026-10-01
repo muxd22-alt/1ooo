@@ -5,14 +5,28 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import path from 'node:path';
 
 const ROOT = path.dirname(fileURLToPath(new URL('../package.json', import.meta.url)));
-const CHROME = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+const CHROME =
+  process.env.CHROME_PATH ??
+  (process.platform === 'win32'
+    ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+    : '/usr/bin/google-chrome');
 const APP_PORT = 5310;
 const DEBUG_PORT = 9233;
 const PROFILE = path.join(ROOT, '.chrome-smoke');
 const TIMEOUT_MS = 90000;
 
 function killTree(pid) {
-  spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+  if (process.platform === 'win32') {
+    spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+  } else {
+    try {
+      process.kill(-pid, 'SIGKILL');
+    } catch {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {}
+    }
+  }
 }
 
 async function waitForHttp(url, ms) {
@@ -99,7 +113,7 @@ try {
   vite = spawn(process.execPath, [path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), '--port', String(APP_PORT), '--strictPort'], {
     cwd: ROOT,
     stdio: 'ignore',
-    detached: false
+    detached: process.platform !== 'win32'
   });
 
   await waitForHttp(`http://localhost:${APP_PORT}/`, 30000);
@@ -109,13 +123,14 @@ try {
     [
       '--headless',
       '--no-sandbox',
+      '--enable-unsafe-swiftshader',
       `--user-data-dir=${PROFILE}`,
       `--remote-debugging-port=${DEBUG_PORT}`,
       '--enable-unsafe-webgpu',
       '--window-size=1280,720',
       'about:blank'
     ],
-    { stdio: ['ignore', 'ignore', chromeLogFd] }
+    { stdio: ['ignore', 'ignore', chromeLogFd], detached: process.platform !== 'win32' }
   );
 
   await waitForHttp(`http://127.0.0.1:${DEBUG_PORT}/json/list`, 30000);
