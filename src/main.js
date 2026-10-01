@@ -229,6 +229,8 @@ document.addEventListener('mousedown', (event) => {
 
 window.__engine = {
   shoot: () => shoot(performance.now()),
+  pos: () => [camera.position.x, camera.position.y, camera.position.z],
+  keys: () => [...controls.keys],
   stats: () => ({ shots, hits, voxelsRemoved, quads: lastBuild?.quads ?? 0 }),
   weapon: () => weapon,
   laya: () => ({

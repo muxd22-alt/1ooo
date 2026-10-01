@@ -5,10 +5,9 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.dirname(fileURLToPath(new URL('../package.json', import.meta.url)));
 const CHROME = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const TARGET_URL = process.argv[2] ?? null;
-const APP_PORT = 5311;
-const DEBUG_PORT = 9234;
-const PROFILE = path.join(ROOT, '.chrome-diag');
+const APP_PORT = 5312;
+const DEBUG_PORT = 9235;
+const PROFILE = path.join(ROOT, '.chrome-keys');
 
 function killTree(pid) {
   spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
@@ -29,7 +28,6 @@ async function waitForHttp(url, ms) {
 function createCdp(wsUrl) {
   const ws = new WebSocket(wsUrl);
   const pending = new Map();
-  const events = [];
   let nextId = 1;
   ws.addEventListener('message', (raw) => {
     const msg = JSON.parse(raw.data);
@@ -38,8 +36,6 @@ function createCdp(wsUrl) {
       pending.delete(msg.id);
       if (msg.error) reject(new Error(msg.error.message));
       else resolve(msg.result);
-    } else if (msg.method) {
-      events.push(msg);
     }
   });
   const ready = new Promise((resolve, reject) => {
@@ -47,7 +43,6 @@ function createCdp(wsUrl) {
     ws.addEventListener('error', reject, { once: true });
   });
   return {
-    events,
     async send(method, params = {}) {
       await ready;
       const id = nextId++;
@@ -61,19 +56,22 @@ function createCdp(wsUrl) {
   };
 }
 
+async function evalJson(cdp, expression) {
+  const out = await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+  if (out.exceptionDetails) throw new Error(out.exceptionDetails.text);
+  return out.result.value;
+}
+
 let vite = null;
 let chrome = null;
 let cdp = null;
 
 try {
-  if (!TARGET_URL) {
-    vite = spawn(process.execPath, [path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), '--port', String(APP_PORT), '--strictPort'], {
-      cwd: ROOT,
-      stdio: 'ignore'
-    });
-    await waitForHttp(`http://localhost:${APP_PORT}/`, 30000);
-  }
-  const url = TARGET_URL ?? `http://localhost:${APP_PORT}/`;
+  vite = spawn(process.execPath, [path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), '--port', String(APP_PORT), '--strictPort'], {
+    cwd: ROOT,
+    stdio: 'ignore'
+  });
+  await waitForHttp(`http://localhost:${APP_PORT}/`, 30000);
 
   chrome = spawn(
     CHROME,
@@ -86,31 +84,36 @@ try {
   cdp = createCdp(page.webSocketDebuggerUrl);
   await cdp.send('Runtime.enable');
   await cdp.send('Page.enable');
-  await cdp.send('Page.navigate', { url });
+  await cdp.send('Page.navigate', { url: `http://localhost:${APP_PORT}/` });
 
-  await sleep(8000);
-  const hud = (await cdp.send('Runtime.evaluate', {
-    expression: "document.getElementById('hud-stats')?.textContent ?? ''",
-    returnByValue: true
-  })).result.value;
-  const gpu = (await cdp.send('Runtime.evaluate', {
-    expression: 'JSON.stringify({ gpu: !!navigator.gpu, engine: !!window.__engine })',
-    returnByValue: true
-  })).result.value;
-  const errors = cdp.events
-    .filter((e) => e.method === 'Runtime.exceptionThrown')
-    .map((e) => `${e.params.exceptionDetails.text} ${e.params.exceptionDetails.exception?.description ?? ''}`);
-  const warnings = cdp.events
-    .filter((e) => e.method === 'Runtime.consoleAPICalled' && ['error', 'warning'].includes(e.params.type))
-    .map((e) => `${e.params.type}: ${e.params.args.map((a) => a.value ?? a.description ?? '').join(' ')}`);
+  const deadline = Date.now() + 60000;
+  for (;;) {
+    if (Date.now() > deadline) throw new Error('engine not ready');
+    const ready = await evalJson(cdp, "!!(window.__engine && /fps/.test(document.getElementById('hud-stats').textContent))");
+    if (ready) break;
+    await sleep(500);
+  }
 
-  console.log(`no-WebGPU-flag headless check:`);
-  console.log(`  gpu/engine: ${gpu}`);
-  console.log(`  hud: ${JSON.stringify(hud)}`);
-  console.log(`  exceptions: ${errors.length ? errors.join(' | ') : 'none'}`);
-  console.log(`  console: ${warnings.length ? warnings.slice(0, 8).join(' | ') : 'none'}`);
+  const p0 = await evalJson(cdp, 'JSON.stringify(window.__engine.pos())');
+
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', code: 'KeyW', key: 'w', windowsVirtualKeyCode: 87 });
+  await sleep(700);
+  const keysHeld = await evalJson(cdp, 'JSON.stringify(window.__engine.keys())');
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', code: 'KeyW', key: 'w', windowsVirtualKeyCode: 87 });
+  await sleep(100);
+  const p1 = await evalJson(cdp, 'JSON.stringify(window.__engine.pos())');
+
+  const a = JSON.parse(p0);
+  const b = JSON.parse(p1);
+  const moved = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+
+  console.log(`keys while held: ${keysHeld}`);
+  console.log(`pos before: ${p0}`);
+  console.log(`pos after:  ${p1}`);
+  console.log(`WASD movement: ${moved > 1 ? `moved ${moved.toFixed(1)}m — OK` : `only ${moved.toFixed(2)}m — BROKEN`}`);
+  if (moved <= 1) process.exitCode = 1;
 } catch (err) {
-  console.error(`DIAG FAIL: ${err.message}`);
+  console.error(`FAIL: ${err.message}`);
   process.exitCode = 1;
 } finally {
   cdp?.close();
