@@ -1,4 +1,5 @@
 import { BLOCK } from './blocks.js';
+import { PREFAB_COLORS, PREFAB_EMISSIVE } from './prefabPalette.js';
 
 function mulberry32(a) {
   return function () {
@@ -138,8 +139,8 @@ export function makeTheme(seed) {
   return {
     seed,
     name,
-    palette,
-    emissive,
+    palette: { ...PREFAB_COLORS, ...palette },
+    emissive: { ...PREFAB_EMISSIVE, ...emissive },
     sky: toHex(hslToRgb(hSky, 0.3 + rand() * 0.3, 0.58 + rand() * 0.14)),
     skyNight: toHex(hslToRgb(hSky, 0.45, 0.05 + rand() * 0.05)),
     dusk: toHex(hslToRgb(hSky + 30, 0.7, 0.55)),

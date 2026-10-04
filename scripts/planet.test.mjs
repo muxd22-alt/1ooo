@@ -13,6 +13,8 @@ import {
 } from '../src/world/planet.js';
 import { greedyMesh } from '../src/world/greedyMesher.js';
 import { raycastVoxels } from '../src/world/voxelOps.js';
+import { PREFAB_POOLS } from '../src/world/prefabs.js';
+import { PREFAB_IDS } from '../src/world/prefabPalette.js';
 
 function assert(condition, message) {
   if (!condition) {
@@ -45,7 +47,7 @@ const other = generatePlanet(90210);
 assert(Buffer.compare(Buffer.from(voxels), Buffer.from(other)) !== 0, 'different seed changes the planet');
 const t2 = performance.now();
 
-const known = new Set(Object.values(BLOCK));
+const known = new Set([...Object.values(BLOCK), ...PREFAB_IDS]);
 const histogram = new Map();
 for (let i = 0; i < voxels.length; i++) {
   const id = voxels[i];
@@ -92,9 +94,21 @@ const neon =
   count(BLOCK.NEON_PINK) + count(BLOCK.NEON_CYAN) + count(BLOCK.NEON_AMBER);
 assert(neon > 0, `neon signs exist (${neon})`);
 const walls = count(BLOCK.BRICK) + count(BLOCK.METAL) + count(BLOCK.WOOD);
-assert(walls > 0, `building walls exist (${walls})`);
-assert(count(BLOCK.GLASS) > 0, `window glass exists (${count(BLOCK.GLASS)})`);
-assert(count(BLOCK.LEAVES) > 0, `trees exist (${count(BLOCK.LEAVES)})`);
+function idsOf(list) {
+  const s = new Set();
+  for (const p of list) for (const c of p.cells) if (c) s.add(c);
+  return s;
+}
+function countSet(ids) {
+  let n = 0;
+  for (const id of ids) n += count(id);
+  return n;
+}
+const buildingList = [...PREFAB_POOLS.tower, ...PREFAB_POOLS.mid, ...PREFAB_POOLS.low, ...PREFAB_POOLS.shop];
+const prefabBuildings = countSet(idsOf(buildingList));
+const prefabTrees = countSet(idsOf(PREFAB_POOLS.tree));
+assert(prefabBuildings > 500, `voxelized buildings exist (${prefabBuildings})`);
+assert(prefabTrees > 50, `voxelized trees exist (${prefabTrees})`);
 
 assert(classifyDirection(0.001, 0.5 * DEG) === 'cross', 'equator crossing is a cross');
 assert(

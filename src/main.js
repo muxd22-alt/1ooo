@@ -497,6 +497,13 @@ document.addEventListener('mousedown', (event) => {
 window.__engine = {
   shoot: () => shoot(performance.now()),
   pos: () => [camera.position.x, camera.position.y, camera.position.z],
+  view: (feet, yaw = 0, pitch = -0.15) => {
+    controls.respawn({ x: feet[0], y: feet[1], z: feet[2] });
+    controls.pitch = pitch;
+    controls.forwardH.applyAxisAngle(controls._up, yaw);
+    controls.applyToCamera();
+    return [camera.position.x, camera.position.y, camera.position.z];
+  },
   keys: () => [...controls.keys],
   stats: () => ({ shots, hits, voxelsRemoved, quads: lastBuild?.quads ?? 0 }),
   weapon: () => weapon,

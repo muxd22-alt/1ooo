@@ -1,4 +1,5 @@
 import { BLOCK } from './blocks.js';
+import { PREFAB_POOLS, structurePool, prefabCell } from './prefabs.js';
 
 export const PLANET = Object.freeze({ size: 192, center: 96, radius: 64, maxStruct: 22 });
 export const SUB_SIZE = 48;
@@ -198,37 +199,6 @@ function inRect(s, r) {
   return s.lu >= r[0] && s.lu <= r[1] && s.lv >= r[2] && s.lv <= r[3];
 }
 
-function rectIndex(s, rects) {
-  for (let i = 0; i < rects.length; i++) if (inRect(s, rects[i])) return i;
-  return -1;
-}
-
-function boxMaterial(s, h, rect, height, wall, windowed) {
-  if (h > height) return 0;
-  const u0 = rect[0];
-  const u1 = rect[1];
-  const v0 = rect[2];
-  const v1 = rect[3];
-  const inU = s.lu - u0;
-  const outU = u1 - s.lu;
-  const inV = s.lv - v0;
-  const outV = v1 - s.lv;
-  if (h >= height - 0.75) return BLOCK.CONCRETE;
-  const boundary = inU < s.wallU || outU < s.wallU || inV < s.wallV || outV < s.wallV;
-  if (!boundary) return wall;
-  if (windowed) {
-    const lvl = Math.floor(h);
-    if (lvl >= 1 && lvl % 3 === 1) {
-      const along =
-        inU < s.wallU || outU < s.wallU
-          ? Math.floor(((s.lv - v0) / (v1 - v0)) * 7)
-          : Math.floor(((s.lu - u0) / (u1 - u0)) * 7);
-      if (along % 4 !== 0) return BLOCK.GLASS;
-    }
-  }
-  return wall;
-}
-
 function neonMaterial(s, h, rect, height, seed, salt) {
   if (rand01(seed ^ 0xbeef, salt, salt + 7) >= 0.55) return 0;
   if (h < height - 5.5 || h > height - 1.4) return 0;
@@ -247,112 +217,37 @@ function neonMaterial(s, h, rect, height, seed, salt) {
   return 0;
 }
 
-const TOWER_RECT = Object.freeze([0.14, 0.86, 0.14, 0.86]);
-const TWIN_RECTS = Object.freeze([
-  Object.freeze([0.05, 0.45, 0.1, 0.9]),
-  Object.freeze([0.55, 0.95, 0.1, 0.9])
-]);
-const ROW_RECTS = Object.freeze([
-  Object.freeze([0.06, 0.46, 0.06, 0.46]),
-  Object.freeze([0.54, 0.94, 0.06, 0.46]),
-  Object.freeze([0.06, 0.46, 0.54, 0.94]),
-  Object.freeze([0.54, 0.94, 0.54, 0.94])
-]);
-const CORNER_RECTS = Object.freeze([
-  Object.freeze([0.03, 0.4, 0.03, 0.4]),
-  Object.freeze([0.6, 0.97, 0.03, 0.4]),
-  Object.freeze([0.03, 0.4, 0.6, 0.97]),
-  Object.freeze([0.6, 0.97, 0.6, 0.97])
-]);
-const MARKET_RECTS = Object.freeze([
-  Object.freeze([0.08, 0.44, 0.08, 0.44]),
-  Object.freeze([0.56, 0.92, 0.08, 0.44]),
-  Object.freeze([0.08, 0.44, 0.56, 0.92]),
-  Object.freeze([0.56, 0.92, 0.56, 0.92])
-]);
+const BUILDING_RECT = Object.freeze([0.14, 0.86, 0.14, 0.86]);
 
-function towerMaterial(s, h, seed) {
-  if (!inRect(s, TOWER_RECT)) return 0;
+function buildingMaterial(s, h, seed) {
+  const pool = structurePool(s.kind);
+  if (!pool) return 0;
+  if (!inRect(s, BUILDING_RECT)) return 0;
   const salt = slotSalt(s, 0);
-  const height = 11 + Math.floor(rand01(seed ^ 0x9b9b, salt, salt + 1) * 9);
-  if (h > height) return 0;
-  const neon = neonMaterial(s, h, TOWER_RECT, height, seed, salt);
-  if (neon) return neon;
-  const walls = [BLOCK.CONCRETE, BLOCK.BRICK, BLOCK.CONCRETE, BLOCK.METAL];
-  const wall = walls[Math.floor(rand01(seed ^ 0x5d5d, salt, salt + 2) * walls.length)];
-  return boxMaterial(s, h, TOWER_RECT, height, wall, true);
-}
-
-function twinMaterial(s, h, seed) {
-  const i = rectIndex(s, TWIN_RECTS);
-  if (i < 0) return 0;
-  const salt = slotSalt(s, i);
-  const height =
-    i === 0
-      ? 9 + Math.floor(rand01(seed ^ 0x6101, salt, salt + 1) * 9)
-      : 7 + Math.floor(rand01(seed ^ 0x6202, salt, salt + 2) * 6);
-  if (h > height) return 0;
-  const neon = neonMaterial(s, h, TWIN_RECTS[i], height, seed, salt * 2 + i);
-  if (neon) return neon;
-  return boxMaterial(s, h, TWIN_RECTS[i], height, i === 0 ? BLOCK.CONCRETE : BLOCK.METAL, true);
-}
-
-function rowMaterial(s, h, seed) {
-  const i = rectIndex(s, ROW_RECTS);
-  if (i < 0) return 0;
-  const salt = slotSalt(s, i);
-  const height = 5 + Math.floor(rand01(seed ^ (0x3000 + i), salt, salt + i) * 4);
-  if (h > height) return 0;
-  const walls = [BLOCK.BRICK, BLOCK.WOOD, BLOCK.CONCRETE, BLOCK.METAL];
-  const wall = walls[Math.floor(rand01(seed ^ (0x4000 + i), salt + i, salt) * walls.length)];
-  return boxMaterial(s, h, ROW_RECTS[i], height, wall, true);
-}
-
-function cornersMaterial(s, h, seed) {
-  const i = rectIndex(s, CORNER_RECTS);
-  if (i < 0) return 0;
-  const salt = slotSalt(s, i);
-  const height = 6 + Math.floor(rand01(seed ^ (0x5000 + i), salt + i * 7, salt + i * 3) * 6);
-  if (h > height) return 0;
-  if (i === 0) {
-    const neon = neonMaterial(s, h, CORNER_RECTS[0], height, seed, salt);
-    if (neon) return neon;
-  }
-  const walls = [BLOCK.BRICK, BLOCK.CONCRETE, BLOCK.BRICK, BLOCK.METAL];
-  return boxMaterial(s, h, CORNER_RECTS[i], height, walls[i], true);
-}
-
-function marketMaterial(s, h, seed) {
-  const i = rectIndex(s, MARKET_RECTS);
-  if (i < 0) return 0;
-  const salt = slotSalt(s, i);
-  const height = 2.9;
-  if (h > height) return 0;
-  const rect = MARKET_RECTS[i];
-  const inU = s.lu - rect[0];
-  const outU = rect[1] - s.lu;
-  const inV = s.lv - rect[2];
-  const outV = rect[3] - s.lv;
-  const boundary = inU < s.wallU || outU < s.wallU || inV < s.wallV || outV < s.wallV;
-  if (boundary && h > 1.95 && h <= 2.45) {
-    return NEON_IDS[hash3i(salt, s.sJ * 3 + 1, seed) % NEON_IDS.length];
-  }
-  if (h >= height - 0.55) return BLOCK.CONCRETE;
-  return BLOCK.WOOD;
+  const pick = Math.floor(rand01(seed ^ 0x3d3d, salt, salt + 5) * pool.length);
+  const p = pool[Math.min(pool.length - 1, pick)];
+  const fu = (s.lu - BUILDING_RECT[0]) / (BUILDING_RECT[1] - BUILDING_RECT[0]);
+  const fv = (s.lv - BUILDING_RECT[2]) / (BUILDING_RECT[3] - BUILDING_RECT[2]);
+  const px = Math.min(p.w - 1, Math.floor(fu * p.w));
+  const pz = Math.min(p.d - 1, Math.floor(fv * p.d));
+  const m = prefabCell(p, px, Math.floor(h - STRUCT_LO), pz);
+  if (!m) return 0;
+  const top = STRUCT_LO + p.h - 1;
+  return neonMaterial(s, h, BUILDING_RECT, top, seed, salt) || m;
 }
 
 function treeMaterial(s, h, seed, salt, count) {
-  if (h < -1.5 || h > 9) return 0;
+  if (h < -1.5 || h > 12) return 0;
+  const pool = PREFAB_POOLS.tree;
   for (let i = 0; i < count; i++) {
     const tx = 0.28 + rand01(seed ^ (0x1100 + i), salt, salt + i) * 0.44;
     const tz = 0.28 + rand01(seed ^ (0x2200 + i), salt + i, salt) * 0.44;
-    const trunkH = 2.6 + (hash3i(i, salt, seed) % 3) * 0.6;
-    const dx = (s.lu - tx) * s.slotWvox;
-    const dz = (s.lv - tz) * s.slotHvox;
-    const d2 = dx * dx + dz * dz;
-    if (d2 <= 1.15 * 1.15 && h <= trunkH) return BLOCK.TRUNK;
-    const dy = h - (trunkH + 2.1);
-    if (d2 + dy * dy <= 1.9 * 1.9) return BLOCK.LEAVES;
+    const p = pool[hash3i(i * 5 + 2, salt, seed ^ 0x7e3d) % pool.length];
+    const px = Math.floor((s.lu - tx) * s.slotWvox + p.w / 2);
+    const pz = Math.floor((s.lv - tz) * s.slotHvox + p.d / 2);
+    if (px < 0 || pz < 0 || px >= p.w || pz >= p.d) continue;
+    const m = prefabCell(p, px, Math.floor(h + 1.5), pz);
+    if (m) return m;
   }
   return 0;
 }
@@ -417,15 +312,11 @@ function slotStructure(s, h, seed) {
   if (h < STRUCT_LO || h > PLANET.maxStruct) return 0;
   switch (s.kind) {
     case 'tower':
-      return towerMaterial(s, h, seed);
     case 'twin':
-      return twinMaterial(s, h, seed);
     case 'row':
-      return rowMaterial(s, h, seed);
     case 'corners':
-      return cornersMaterial(s, h, seed);
     case 'market':
-      return marketMaterial(s, h, seed);
+      return buildingMaterial(s, h, seed);
     case 'park':
       return parkMaterial(s, h, seed);
     case 'garden':

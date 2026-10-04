@@ -1,5 +1,6 @@
 import { BLOCK } from '../src/world/blocks.js';
 import { makeTheme } from '../src/world/theme.js';
+import { PREFAB_IDS } from '../src/world/prefabPalette.js';
 
 function assert(condition, message) {
   if (!condition) {
@@ -28,7 +29,7 @@ for (const id of ids) {
 }
 
 for (const [id, rgb] of Object.entries(a.emissive)) {
-  assert(ids.includes(Number(id)), `emissive key ${id} is a known block id`);
+  assert(ids.includes(Number(id)) || PREFAB_IDS.includes(Number(id)), `emissive key ${id} is a known block id`);
   assert(rgb.length === 3, `emissive[${id}] is rgb triple`);
   for (const ch of rgb) {
     assert(Number.isFinite(ch), `emissive[${id}] non-finite channel`);
