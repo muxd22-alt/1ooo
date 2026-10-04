@@ -1,9 +1,5 @@
 export const CHUNK = Object.freeze({ x: 100, y: 64, z: 100 });
 
-export const GRID = Object.freeze({ x: 4, z: 3 });
-
-export const WORLD = Object.freeze({ x: CHUNK.x * GRID.x, y: CHUNK.y, z: CHUNK.z * GRID.z });
-
 export const BLOCK = Object.freeze({
   AIR: 0,
   GRASS: 1,
@@ -79,8 +75,4 @@ export const BLOCK_EMISSIVE = Object.freeze({
 
 export function voxelIndex(x, y, z) {
   return x + CHUNK.x * (y + CHUNK.y * z);
-}
-
-export function worldIndex(x, y, z) {
-  return x + WORLD.x * (y + WORLD.y * z);
 }

@@ -1,8 +1,9 @@
 import * as THREE from 'three/webgpu';
 import './style.css';
-import { CHUNK, GRID, WORLD } from './world/blocks.js';
+import { PLANET, SUB_SIZE } from './world/planet.js';
+import { makeTheme } from './world/theme.js';
 import { createChunkMaterial } from './render/chunkMaterial.js';
-import { FlyControls } from './player/flyControls.js';
+import { PlanetControls } from './player/planetControls.js';
 import { loadPreset } from './game/weapons/loadout.js';
 import {
   TELEMETRY_INTERVAL_MS,
@@ -76,10 +77,12 @@ const backendName = renderer.backend?.isWebGPUBackend
     ? 'WebGL2'
     : 'unknown';
 
+const planetCenter = new THREE.Vector3(PLANET.center, PLANET.center, PLANET.center);
+
 const scene = new THREE.Scene();
 const skyColor = new THREE.Color(0x8fb8de);
 scene.background = skyColor;
-scene.fog = new THREE.FogExp2(skyColor, 0.005);
+scene.fog = new THREE.FogExp2(skyColor, 0.0045);
 
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 900);
 camera.rotation.order = 'YXZ';
@@ -96,6 +99,8 @@ const chunkMeshes = new Map();
 const chunkStats = new Map();
 let opId = 0;
 let lastBuild = null;
+let theme = makeTheme(seed);
+let voxelsMirror = null;
 let weapon = loadPreset(1);
 let lastShotAt = -Infinity;
 let shots = 0;
@@ -111,11 +116,23 @@ function requestBuild(nextSeed) {
   worker.postMessage({ type: 'build', id: ++opId, seed });
 }
 
-function chunkKey(cx, cz) {
-  return `${cx},${cz}`;
+function chunkKey(i, j, k) {
+  return `${i},${j},${k}`;
 }
 
 function upsertChunkMesh(chunk) {
+  const key = chunkKey(chunk.i, chunk.j, chunk.k);
+  const old = chunkMeshes.get(key);
+  if (chunk.positions.length === 0) {
+    if (old) {
+      scene.remove(old);
+      old.geometry.dispose();
+      chunkMeshes.delete(key);
+      chunkStats.delete(key);
+    }
+    return;
+  }
+
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(chunk.positions, 3));
   geometry.setAttribute('normal', new THREE.BufferAttribute(chunk.normals, 3));
@@ -124,14 +141,12 @@ function upsertChunkMesh(chunk) {
   geometry.setIndex(new THREE.BufferAttribute(chunk.indices, 1));
   geometry.computeBoundingSphere();
 
-  const key = chunkKey(chunk.cx, chunk.cz);
-  const old = chunkMeshes.get(key);
   if (old) {
     scene.remove(old);
     old.geometry.dispose();
   }
   const mesh = new THREE.Mesh(geometry, chunkMaterial.material);
-  mesh.position.set(chunk.cx * CHUNK.x, 0, chunk.cz * CHUNK.z);
+  mesh.position.set(chunk.i * SUB_SIZE - 1, chunk.j * SUB_SIZE - 1, chunk.k * SUB_SIZE - 1);
   scene.add(mesh);
   chunkMeshes.set(key, mesh);
   chunkStats.set(key, { quads: chunk.quads, faces: chunk.faces, verts: chunk.verts });
@@ -149,6 +164,25 @@ function worldTotals() {
   return { quads, faces, verts };
 }
 
+const SKY_DAY = new THREE.Color(0x8fb8de);
+const SKY_NIGHT = new THREE.Color(0x0a0f1e);
+const SKY_DUSK = new THREE.Color(0xd98a5a);
+const SUN_DAY = new THREE.Color(0xfff2df);
+const MOON_COLOR = new THREE.Color(0x9fb6e8);
+
+function applyTheme(next) {
+  theme = next;
+  SKY_DAY.setHex(theme.sky);
+  SKY_NIGHT.setHex(theme.skyNight);
+  SKY_DUSK.setHex(theme.dusk);
+  SUN_DAY.setHex(theme.sun);
+  MOON_COLOR.setHex(theme.moon);
+  hemiLight.color.setHex(theme.hemiSky);
+  hemiLight.groundColor.setHex(theme.hemiGround);
+}
+
+applyTheme(theme);
+
 worker.onmessage = (event) => {
   const msg = event.data;
   if (msg.type !== 'built') return;
@@ -156,6 +190,9 @@ worker.onmessage = (event) => {
   if (msg.reason === 'shoot') {
     if (msg.hit) hits++;
     voxelsRemoved += msg.removed;
+    if (voxelsMirror && msg.cleared) {
+      for (let n = 0; n < msg.cleared.length; n++) voxelsMirror[msg.cleared[n]] = 0;
+    }
   } else {
     for (const mesh of chunkMeshes.values()) {
       scene.remove(mesh);
@@ -163,15 +200,17 @@ worker.onmessage = (event) => {
     }
     chunkMeshes.clear();
     chunkStats.clear();
+    voxelsMirror = msg.voxels;
+    applyTheme(makeTheme(msg.seed));
+    controls.respawn(msg.spawn);
   }
 
   for (const chunk of msg.chunks) upsertChunkMesh(chunk);
 
-  if (msg.reason === 'build') camera.position.set(msg.spawn.x, msg.spawn.y, msg.spawn.z);
-
   const totals = worldTotals();
   lastBuild = {
     seed: msg.seed,
+    themeName: theme.name,
     genMs: msg.stats.genMs ?? lastBuild?.genMs ?? 0,
     meshMs: msg.stats.meshMs ?? 0,
     quads: totals.quads,
@@ -185,7 +224,13 @@ worker.onerror = (err) => {
   console.error(err);
 };
 
-const controls = new FlyControls(camera, canvas);
+const controls = new PlanetControls(camera, canvas);
+controls.setWorld({
+  getVoxels: () => voxelsMirror,
+  size: PLANET.size,
+  center: planetCenter,
+  radius: PLANET.radius
+});
 
 const telemetry = createTelemetryState();
 const laya = {
@@ -234,7 +279,8 @@ setInterval(() => {
   if (samplingPaused) return;
   accrueCombatTime(telemetry, now, dt);
   pushPosition(telemetry, camera.position);
-  const features = buildFeatureVector(telemetry, camera.position.y / CHUNK.y);
+  const elevation = (camera.position.distanceTo(planetCenter) - PLANET.radius) / 24;
+  const features = buildFeatureVector(telemetry, elevation);
   layaWorker.postMessage(
     { type: 'INFER_TELEMETRY', payload: { telemetryBuffer: features.buffer } },
     [features.buffer]
@@ -279,6 +325,12 @@ window.__engine = {
   keys: () => [...controls.keys],
   stats: () => ({ shots, hits, voxelsRemoved, quads: lastBuild?.quads ?? 0 }),
   weapon: () => weapon,
+  planet: () => ({
+    size: PLANET.size,
+    radius: PLANET.radius,
+    center: [PLANET.center, PLANET.center, PLANET.center],
+    mode: 'gravity'
+  }),
   dayPhase: () => dayNight(performance.now()).phase,
   laya: () => ({
     ready: laya.ready,
@@ -338,11 +390,6 @@ let fps = 60;
 let lastFrame = performance.now();
 let lastHud = 0;
 
-const SKY_DAY = new THREE.Color(0x8fb8de);
-const SKY_NIGHT = new THREE.Color(0x0a0f1e);
-const SKY_DUSK = new THREE.Color(0xd98a5a);
-const SUN_DAY = new THREE.Color(0xfff2df);
-const MOON_COLOR = new THREE.Color(0x9fb6e8);
 const skyBlend = new THREE.Color();
 const sunBlend = new THREE.Color();
 const layaSkyColor = new THREE.Color();
@@ -417,9 +464,9 @@ renderer.setAnimationLoop((now) => {
     lastHud = now;
     const clock = clockFromPhase(dn.phase) + (dn.night > 0.5 ? ' night' : dn.night > 0.1 ? ' dusk' : '');
     const build = lastBuild
-      ? `seed ${lastBuild.seed} · ${clock} · gen ${lastBuild.genMs.toFixed(1)}ms · mesh ${lastBuild.meshMs.toFixed(1)}ms · ` +
-        `${lastBuild.quads.toLocaleString()} quads · ${lastBuild.faces.toLocaleString()} faces`
-      : `building city… seed ${seed}`;
+      ? `seed ${lastBuild.seed} · ${lastBuild.themeName} · ${clock} · gen ${lastBuild.genMs.toFixed(1)}ms · ` +
+        `mesh ${lastBuild.meshMs.toFixed(1)}ms · ${lastBuild.faces.toLocaleString()} faces`
+      : `building planet… seed ${seed}`;
     const gun =
       `${weapon.name} [${weapon.partIds.map((id) => id.replace('part_', '')).join(' + ')}] · ` +
       `dmg ${weapon.damage.toFixed(1)} · ${weapon.fireRateRPM.toFixed(0)} rpm · ` +
@@ -431,9 +478,11 @@ renderer.setAnimationLoop((now) => {
       : `laya ${laya.ready ? 'ready' : 'loading…'} · intent ${laya.intent} · margin ${laya.margin.toFixed(2)} · ` +
         `${laya.latencyMs.toFixed(1)}ms · ${laya.inferCount} inferences`;
     hudStats.textContent =
-      `${backendName} · ${fps.toFixed(0)} fps · world ${WORLD.x}x${WORLD.y}x${WORLD.z} · ` +
-      `${GRID.x * GRID.z} city chunks\n` +
-      `${build}\n${gun}\n${ai}`;
+      `${backendName} · ${fps.toFixed(0)} fps · planet r${PLANET.radius} · ` +
+      (lastBuild
+        ? `${lastBuild.quads.toLocaleString()} quads · ${chunkMeshes.size} sub-chunks\n${build}\n`
+        : `building planet… seed ${seed}\n`) +
+      `${gun}\n${ai}`;
   }
 });
 

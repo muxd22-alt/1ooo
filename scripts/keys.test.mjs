@@ -89,10 +89,14 @@ try {
   const deadline = Date.now() + 60000;
   for (;;) {
     if (Date.now() > deadline) throw new Error('engine not ready');
-    const ready = await evalJson(cdp, "!!(window.__engine && /fps/.test(document.getElementById('hud-stats').textContent))");
+    const ready = await evalJson(
+      cdp,
+      "!!(window.__engine && /fps/.test(document.getElementById('hud-stats').textContent) && /quads/.test(document.getElementById('hud-stats').textContent))"
+    );
     if (ready) break;
     await sleep(500);
   }
+  await sleep(1500);
 
   const p0 = await evalJson(cdp, 'JSON.stringify(window.__engine.pos())');
 

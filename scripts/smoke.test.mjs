@@ -190,6 +190,28 @@ try {
   }
   mark('engine ready (fps+quads in hud)');
 
+  await sleep(2500);
+  const boundsOut = await cdp.send('Runtime.evaluate', {
+    expression:
+      'JSON.stringify({ pos: window.__engine?.pos?.(), planet: window.__engine?.planet?.() ?? null })',
+    returnByValue: true
+  });
+  const bounds = JSON.parse(boundsOut.result.value);
+  if (!bounds.planet) throw new Error(`planet state unavailable: ${JSON.stringify(bounds)}`);
+  if (bounds.planet.mode !== 'gravity') {
+    throw new Error(`expected gravity mode, got ${JSON.stringify(bounds.planet)}`);
+  }
+  const [cx, cy, cz] = bounds.planet.center;
+  const radial = Math.hypot(bounds.pos[0] - cx, bounds.pos[1] - cy, bounds.pos[2] - cz);
+  const lo = bounds.planet.radius - 0.5;
+  const hi = bounds.planet.radius + 12;
+  if (!(radial >= lo && radial <= hi)) {
+    throw new Error(
+      `player not bound to planet surface: radial ${radial.toFixed(2)} outside [${lo}, ${hi}] · pos ${JSON.stringify(bounds.pos)}`
+    );
+  }
+  mark(`planet bounds OK (radial ${radial.toFixed(2)} ∈ [${lo}, ${hi}])`);
+
   const fireDeadline = Date.now() + 20000;
   let fireStats = null;
   while (Date.now() < fireDeadline) {

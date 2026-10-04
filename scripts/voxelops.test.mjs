@@ -1,4 +1,4 @@
-import { raycastVoxels, subtractSphere } from '../src/world/voxelOps.js';
+import { raycastVoxels, subtractSphere, subtractSphereIndexed } from '../src/world/voxelOps.js';
 
 function assert(condition, message) {
   if (!condition) {
@@ -109,6 +109,41 @@ const OPEN = 5;
   const voxels = filledGrid(SOLID);
   const removed = subtractSphere(voxels, N, N, N, [5.5, 5.5, 5.5], 50);
   assert(removed === SIZE, `oversized sphere clamps to whole grid (got ${removed})`);
+}
+
+{
+  const voxels = filledGrid(SOLID);
+  const cleared = subtractSphereIndexed(voxels, N, N, N, [5.5, 5.5, 5.5], 50);
+  assert(cleared instanceof Uint32Array, 'indexed sphere returns Uint32Array');
+  assert(cleared.length === SIZE, `indexed sphere clears every voxel (got ${cleared.length})`);
+  const seen = new Set(cleared);
+  assert(seen.size === SIZE, 'indexed sphere returns unique indices');
+  for (let n = 0; n < cleared.length; n++) {
+    const i = cleared[n];
+    assert(voxels[i] === 0, `cleared index ${i} is air`);
+    const x = i % N;
+    const y = Math.floor(i / N) % N;
+    const z = Math.floor(i / (N * N));
+    assert(idx(x, y, z) === i, 'index layout matches x + N*(y + N*z)');
+  }
+}
+
+{
+  const voxels = filledGrid(SOLID);
+  voxels[idx(5, 5, 5)] = 0;
+  const reference = filledGrid(SOLID);
+  subtractSphere(reference, N, N, N, [5.5, 5.5, 5.5], 1.1);
+  const cleared = subtractSphereIndexed(voxels, N, N, N, [5.5, 5.5, 5.5], 1.1);
+  assert(cleared.length === 6, `indexed skips pre-cleared voxels (got ${cleared.length})`);
+  for (let n = 0; n < cleared.length; n++) assert(voxels[cleared[n]] === 0, 'indexed cleared voxel is air');
+  assert(reference.join('') === voxels.join(''), 'indexed and plain sphere produce identical grids');
+}
+
+{
+  const voxels = filledGrid(SOLID);
+  const cleared = subtractSphereIndexed(voxels, N, N, N, [5.5, 5.5, 5.5], 0);
+  assert(cleared.length === 0, 'zero radius clears nothing');
+  assert(voxels.every((v) => v === SOLID), 'grid untouched by zero radius (indexed)');
 }
 
 console.log('OK  raycast + sphere destruction tests passed');

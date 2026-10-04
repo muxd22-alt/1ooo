@@ -14,13 +14,16 @@ Live build: https://muxd22-alt.github.io/1ooo/
 
 ## Key Features
 
-* **Procedural City World:** A seeded `400 x 64 x 300` city assembled from **12 chunk templates** (100³ voxels each) that mix-and-match per seed — road grid, sidewalks, buildings, fences, parks, plazas, parking lots and markets. Road corridors are placed from world-space coordinates, so every chunk seam connects mathematically for any seed (verified by `scripts/city.test.mjs`).
-* **Day/Night Cycle & Street Lights:** A 3-minute sunrise→noon→dusk→midnight cycle drives sun/moon position, sky, fog and a TSL `nightGlow` uniform — lamp posts, neon signs and glass windows are emissive voxel materials that light up the city after dark (`?phase=0.75` starts at midnight).
+* **Round Planet World:** A seeded `192³` voxel planet (radius 64) with **radial gravity** — no map edges, you can walk the full globe and never fall off. The spherical city is laid out on meridian/parallel road corridors (every 45°), split into **16 cells × 9 plots × 12 districts** (downtown towers, rowhouses, parks, plazas, parking…), with sidewalk lamp posts, neon signs and fountains. Generation is analytic per-voxel (no chunk seams at all) and verified by `scripts/planet.test.mjs`.
+* **Per-Seed Color Themes:** `makeTheme(seed)` deterministically derives the whole palette from the seed — HSL-jittered nature/structure hues, emissive lamp/neon glow, sky/dusk/moon/sun/hemisphere colors — so every world has its own identity (the "recolor trick"). Same seed → same theme on client and worker.
+* **Rounded Voxel Shading:** The worker meshes 48³ sub-chunks with a 1-voxel halo, baking **per-vertex ambient occlusion** and **smooth normals** for soft, rounded planet curvature (AO multiplies albedo only, never emissive).
+* **Responsive FPS Movement:** `PlanetControls` gives 1:1 responsive FPS movement — raw mouse input, instant ground velocity, sprint (Shift), jump (Space), step-up/step-down traversal, air control and a fly toggle (F) — all in a rotating radial-gravity frame.
+* **Day/Night Cycle & Street Lights:** A 3-minute sunrise→noon→dusk→midnight cycle drives sun/moon position, sky, fog and a TSL `nightGlow` uniform — lamp posts, neon signs and glass windows are emissive voxel materials that light up the planet after dark (`?phase=0.75` starts at midnight).
 * **WebGPU Voxel Renderer & Worker Greedy Mesher:** Offloads chunk mesh generation to non-blocking Web Workers using greedy meshing, combined with Three Shader Language (TSL) node materials. Automatic WebGL2 fallback when no WebGPU adapter is available.
 * **CSG Voxel Destruction:** Real-time spherical voxel subtraction (`subtractSphere`) driven by DDA raycasting over the full world — shots carve craters and re-mesh only the affected chunks in the worker.
 * **Modular Gunsmith System:** 4-slot weapon assembly framework (Receiver, Barrel, Grip, Magazine) with deterministic attribute aggregation, weight clamping, and recoil impulse vector scaling. 10 parts, 28/36 valid assemblies, JSON-Schema validated.
 * **Laya ONNX Edge AI (Web Worker):** Executes a quantized INT8 neural network (`onnxruntime-web` over WASM) off-thread to analyze 10 Hz player telemetry vectors (aim sigma, APM, movement variance) into tactical logits — AGGRESSIVE / HARVESTER / CAMPER — driving atmosphere and director state.
-* **Deterministic Seeding:** City generation is seeded (`?seed=1337` or `R` to reseed) and reproducible across client and CI (reference-tested mesher output).
+* **Deterministic Seeding:** Planet generation and its color theme are seeded (`?seed=1337` or `R` to reseed) and reproducible across client and CI (reference-tested mesher output).
 
 ---
 
@@ -31,10 +34,11 @@ Live build: https://muxd22-alt.github.io/1ooo/
 │                        Browser Client                        │
 ├────────────────────┬─────────────────────┬───────────────────┤
 │  WebGPU Renderer   │  Mesher Worker      │  Laya AI Worker   │
-│  • three/webgpu    │  • city gen (12x)   │  • INT8 ONNX      │
-│  • TSL material    │  • greedy meshing   │  • 10 Hz telemetry│
-│  • WebGL2 fallback │  • DDA raycast +    │  • intent logits  │
-│  • day/night cycle │    subtractSphere   │    → atmosphere   │
+│  • three/webgpu    │  • planet gen       │  • INT8 ONNX      │
+│  • TSL material    │  • halo greedy mesh │  • 10 Hz telemetry│
+│  • WebGL2 fallback │    (AO + smooth)    │  • intent logits  │
+│  • day/night cycle │  • DDA raycast +    │    → atmosphere   │
+│  • radial gravity  │    subtractSphere   │                   │
 └────────────────────┴─────────────────────┴───────────────────┘
               ▲ build/shoot msgs          ▲ INFER_TELEMETRY
               │ BufferGeometry replies    │ INTENT_RESULT
@@ -53,9 +57,9 @@ All heavy work runs off the main thread: chunk meshing and CSG destruction in on
 | :--- | :--- | :--- |
 | **Graphics** | `Three.js r186` / `WebGPURenderer` | WebGPU rendering pipeline with TSL materials, WebGL2 fallback. |
 | **Build System** | `Vite 8` | ESM bundling, module workers, COOP/COEP headers for isolated WASM threads. |
-| **Meshing** | `Web Workers` | Parallelized greedy meshing for `100 x 64 x 100` voxel chunks (~4.5x face compression), 12-chunk world with per-vertex emissive attributes. |
+| **Meshing** | `Web Workers` | Parallelized greedy meshing of `48³` sub-chunks (halo-extracted for seam-free AO/smooth normals) over a `192³` planet, per-vertex emissive attributes. |
 | **Edge AI** | `onnxruntime-web` | Quantized (INT8) ONNX session running over WASM in a dedicated worker. |
-| **Testing** | `Node scripts` + `CDP` | Unit tests (mesher/voxelops/weapon/telemetry) and Chrome DevTools Protocol smoke testing. |
+| **Testing** | `Node scripts` + `CDP` | Unit tests (mesher/theme/planet/voxelops/weapon/telemetry) and Chrome DevTools Protocol smoke testing. |
 | **Deployment** | `GitHub Actions` → `GitHub Pages` | CI runs test + smoke + build on every push; Pages deploys `dist/` automatically. |
 
 ---
@@ -90,11 +94,14 @@ Visit `http://localhost:5173` in your browser.
 Run the test suite to verify unit logic, weapon math, and headless browser navigation:
 
 ```bash
-# Run unit tests (mesher, city, voxel destruction, weapon aggregation, telemetry/director)
+# Run unit tests (mesher, theme, planet, voxel destruction, weapon aggregation, telemetry/director)
 npm test
 
 # Run CDP headless Chrome smoke test (CDP port 9233 / app port 5310)
 npm run smoke
+
+# WASD movement test over CDP (CDP port 9235 / app port 5312)
+node scripts/keys.test.mjs
 
 # Headless diagnostic (renderer backend + HUD state, no assertions)
 npm run diag
@@ -106,7 +113,7 @@ npm run build
 npm run gen:model
 ```
 
-The smoke test boots Vite + headless Chrome over CDP and asserts: renderer ready, weapon line, a shot that removes voxels, a live Laya inference, and per-intent logits matching `data/laya-reference.json` within tolerance.
+The smoke test boots Vite + headless Chrome over CDP and asserts: renderer ready, planet radial bounds (player glued to the surface in gravity mode), a shot that removes voxels, a live Laya inference, and per-intent logits matching `data/laya-reference.json` within tolerance.
 
 ---
 
@@ -144,8 +151,9 @@ Aggregation rules: damage = flat sum x scalar product; RPM/weight/recoil/radius 
 | Input | Action |
 | :--- | :--- |
 | Click canvas | Capture mouse (pointer lock) |
-| `WASD` | Fly |
-| `Space` / `Shift` | Up / down |
+| `WASD` | Move (sprint with `Shift`) |
+| `Space` | Jump |
+| `F` | Toggle fly mode (`Shift` descends) |
 | `LMB` | Fire (RPM-gated) |
 | `1` – `3` | Loadout preset |
 | `R` | Reseed world |
@@ -157,7 +165,7 @@ Aggregation rules: damage = flat sum x scalar product; RPM/weight/recoil/radius 
 - [x] **Phase 1: Renderer & Meshing** — WebGPU render loop, Web Worker greedy meshing, DDA voxel destruction.
 - [x] **Phase 2: Gunsmith & Edge AI** — 4-slot weapon aggregation, Laya ONNX worker pipeline, HUD telemetry.
 - [x] **Phase 3: CI & Deployment** — GitHub Actions (test + smoke + build) and GitHub Pages auto-deploy.
-- [x] **Phase 4: City World** — 12-chunk seeded city (road grid mathematically connected across seams), 12 district templates, day/night cycle with emissive street lights.
+- [x] **Phase 4: Planet World** — radial-gravity spherical city (meridian roads, 12 districts, no seams), per-seed color themes, AO/smooth shading, day/night cycle with emissive street lights.
 - [ ] **Phase 5: Physics & Colliders** — Rapier3D trimesh/compound-cuboid colliders derived from worker mesher output (rebuilt per re-mesh, not per shot).
 
 ---

@@ -123,3 +123,34 @@ export function subtractSphere(voxels, sx, sy, sz, center, radius) {
   }
   return removed;
 }
+
+export function subtractSphereIndexed(voxels, sx, sy, sz, center, radius) {
+  const [cx, cy, cz] = center;
+  const r2 = radius * radius;
+  if (r2 <= 0) return new Uint32Array(0);
+
+  const x0 = Math.max(0, Math.floor(cx - radius));
+  const x1 = Math.min(sx - 1, Math.ceil(cx + radius));
+  const y0 = Math.max(0, Math.floor(cy - radius));
+  const y1 = Math.min(sy - 1, Math.ceil(cy + radius));
+  const z0 = Math.max(0, Math.floor(cz - radius));
+  const z1 = Math.min(sz - 1, Math.ceil(cz + radius));
+
+  const out = [];
+  for (let z = z0; z <= z1; z++) {
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const dx = x + 0.5 - cx;
+        const dy = y + 0.5 - cy;
+        const dz = z + 0.5 - cz;
+        if (dx * dx + dy * dy + dz * dz > r2) continue;
+        const idx = x + sx * (y + sy * z);
+        if (voxels[idx] !== 0) {
+          voxels[idx] = 0;
+          out.push(idx);
+        }
+      }
+    }
+  }
+  return Uint32Array.from(out);
+}

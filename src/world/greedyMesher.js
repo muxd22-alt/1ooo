@@ -2,22 +2,15 @@ import { BLOCK_EMISSIVE, BLOCK_PALETTE } from './blocks.js';
 
 const PALETTE_FALLBACK = [1, 0, 1];
 const NO_EMISSIVE = [0, 0, 0];
+const AO_LEVELS = [0.45, 0.65, 0.84, 1.0];
 
-/**
- * Greedy mesher over a dense voxel volume.
- * Volume layout: index(x, y, z) = x + sx * (y + sy * z)
- *
- * Mask encoding per (axis, slice, u/v cell): signed material id.
- *   > 0 -> visible face with normal +axis
- *   < 0 -> visible face with normal -axis
- *   0   -> no face
- *
- * @returns {{positions: Float32Array, normals: Float32Array,
- *            colors: Float32Array, emissives: Float32Array,
- *            indices: Uint32Array,
- *            quads: number, verts: number, faces: number}}
- */
-export function greedyMesh(voxels, sx, sy, sz) {
+export function greedyMesh(voxels, sx, sy, sz, opts = {}) {
+  const palette = opts.palette || BLOCK_PALETTE;
+  const emissive = opts.emissive || BLOCK_EMISSIVE;
+  const useAO = !!opts.ao;
+  const useSmooth = !!opts.smooth;
+  const core = opts.core || null;
+
   const dims = [sx, sy, sz];
   const positions = [];
   const normals = [];
@@ -31,8 +24,12 @@ export function greedyMesh(voxels, sx, sy, sz) {
   const at = (x, y, z) =>
     x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz ? 0 : voxels[x + sx * (y + sy * z)];
 
+  const inCore = (x, y, z) =>
+    x >= core[0] && x < core[3] && y >= core[1] && y < core[4] && z >= core[2] && z < core[5];
+
   const cA = [0, 0, 0];
   const cB = [0, 0, 0];
+  const cS = [0, 0, 0];
 
   for (let d = 0; d < 3; d++) {
     const u = (d + 1) % 3;
@@ -54,7 +51,12 @@ export function greedyMesh(voxels, sx, sy, sz) {
           cB[u] = a;
           const ia = plane - 1 < 0 ? 0 : at(cA[0], cA[1], cA[2]);
           const ib = plane >= dims[d] ? 0 : at(cB[0], cB[1], cB[2]);
-          mask[a + row] = ia !== 0 && ib === 0 ? ia : ia === 0 && ib !== 0 ? -ib : 0;
+          let m = ia !== 0 && ib === 0 ? ia : ia === 0 && ib !== 0 ? -ib : 0;
+          if (m !== 0 && core) {
+            const s = m > 0 ? cA : cB;
+            if (!inCore(s[0], s[1], s[2])) m = 0;
+          }
+          mask[a + row] = m;
         }
       }
 
@@ -92,10 +94,27 @@ export function greedyMesh(voxels, sx, sy, sz) {
     }
   }
 
+  function cornerAO(airLayer, d, u, v, cu, cv, quadA, quadB) {
+    const uIn = cu === quadA ? cu : cu - 1;
+    const vIn = cv === quadB ? cv : cv - 1;
+    const uOut = cu === quadA ? cu - 1 : cu;
+    const vOut = cv === quadB ? cv - 1 : cv;
+    cS[d] = airLayer;
+    cS[u] = uOut;
+    cS[v] = vIn;
+    const s1 = at(cS[0], cS[1], cS[2]) !== 0;
+    cS[u] = uIn;
+    cS[v] = vOut;
+    const s2 = at(cS[0], cS[1], cS[2]) !== 0;
+    cS[u] = uOut;
+    const sc = at(cS[0], cS[1], cS[2]) !== 0;
+    return AO_LEVELS[s1 && s2 ? 0 : 3 - ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (sc ? 1 : 0))];
+  }
+
   function emitQuad(d, u, v, plane, a, b, w, h, m) {
     const matId = Math.abs(m);
-    const mat = BLOCK_PALETTE[matId] || PALETTE_FALLBACK;
-    const em = BLOCK_EMISSIVE[matId] || NO_EMISSIVE;
+    const mat = palette[matId] || PALETTE_FALLBACK;
+    const em = emissive[matId] || NO_EMISSIVE;
     const dir = m > 0 ? 1 : -1;
 
     const base = [0, 0, 0];
@@ -117,13 +136,56 @@ export function greedyMesh(voxels, sx, sy, sz) {
     n[d] = dir;
     for (let k = 0; k < 4; k++) normals.push(n[0], n[1], n[2]);
 
-    for (let k = 0; k < 4; k++) colors.push(mat[0], mat[1], mat[2]);
+    if (useAO) {
+      const airLayer = dir > 0 ? plane : plane - 1;
+      const aoA = cornerAO(airLayer, d, u, v, a, b, a, b, w, h);
+      const aoB = cornerAO(airLayer, d, u, v, a + w, b, a, b, w, h);
+      const aoC = cornerAO(airLayer, d, u, v, a + w, b + h, a, b, w, h);
+      const aoD = cornerAO(airLayer, d, u, v, a, b + h, a, b, w, h);
+      const aos = [aoA, aoB, aoC, aoD];
+      for (let k = 0; k < 4; k++) {
+        colors.push(mat[0] * aos[k], mat[1] * aos[k], mat[2] * aos[k]);
+      }
+    } else {
+      for (let k = 0; k < 4; k++) colors.push(mat[0], mat[1], mat[2]);
+    }
     for (let k = 0; k < 4; k++) emissives.push(em[0], em[1], em[2]);
 
     const o = vertCount;
     if (dir > 0) indices.push(o, o + 1, o + 2, o, o + 2, o + 3);
     else indices.push(o, o + 3, o + 2, o, o + 2, o + 1);
     vertCount += 4;
+  }
+
+  if (useSmooth && vertCount > 0) {
+    const sums = new Map();
+    const keyAt = (vi) =>
+      (positions[vi * 3] * 8192 + positions[vi * 3 + 1]) * 8192 + positions[vi * 3 + 2];
+    const original = normals.slice();
+    for (let vi = 0; vi < vertCount; vi++) {
+      const key = keyAt(vi);
+      let s = sums.get(key);
+      if (!s) {
+        s = [0, 0, 0];
+        sums.set(key, s);
+      }
+      s[0] += normals[vi * 3];
+      s[1] += normals[vi * 3 + 1];
+      s[2] += normals[vi * 3 + 2];
+    }
+    for (let vi = 0; vi < vertCount; vi++) {
+      const s = sums.get(keyAt(vi));
+      const len = Math.hypot(s[0], s[1], s[2]);
+      if (len < 1e-6) {
+        normals[vi * 3] = original[vi * 3];
+        normals[vi * 3 + 1] = original[vi * 3 + 1];
+        normals[vi * 3 + 2] = original[vi * 3 + 2];
+        continue;
+      }
+      normals[vi * 3] = s[0] / len;
+      normals[vi * 3 + 1] = s[1] / len;
+      normals[vi * 3 + 2] = s[2] / len;
+    }
   }
 
   return {
