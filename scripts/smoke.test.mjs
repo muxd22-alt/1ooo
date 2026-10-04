@@ -212,6 +212,26 @@ try {
   }
   mark(`planet bounds OK (radial ${radial.toFixed(2)} ∈ [${lo}, ${hi}])`);
 
+  let traffic = null;
+  const trafficDeadline = Date.now() + 20000;
+  while (Date.now() < trafficDeadline) {
+    const tOut = await cdp.send('Runtime.evaluate', {
+      expression: 'JSON.stringify(window.__engine?.traffic?.() ?? null)',
+      returnByValue: true
+    });
+    try {
+      traffic = JSON.parse(tOut.result.value);
+    } catch {
+      traffic = null;
+    }
+    if (traffic && traffic.count >= 4) break;
+    await sleep(500);
+  }
+  if (!traffic || traffic.count < 4) {
+    throw new Error(`traffic fleet did not come online: ${JSON.stringify(traffic)}`);
+  }
+  mark(`traffic fleet online (${traffic.count} cars, ${traffic.moving} moving, ${traffic.parked} parked)`);
+
   const jumpPre = JSON.parse(
     (
       await cdp.send('Runtime.evaluate', {

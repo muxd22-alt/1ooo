@@ -19,6 +19,7 @@ import {
   resetWindow
 } from './ai/telemetry.js';
 import { intentFromLogits, directorState } from './ai/director.js';
+import { createCarFleet } from './game/carFleet.js';
 
 const canvas = document.getElementById('view');
 const hudStats = document.getElementById('hud-stats');
@@ -497,6 +498,12 @@ document.addEventListener('mousedown', (event) => {
 window.__engine = {
   shoot: () => shoot(performance.now()),
   pos: () => [camera.position.x, camera.position.y, camera.position.z],
+  camFwd: () => {
+    const d = new THREE.Vector3();
+    camera.getWorldDirection(d);
+    return [d.x, d.y, d.z];
+  },
+  pitch: () => controls.pitch,
   view: (feet, yaw = 0, pitch = -0.15) => {
     controls.respawn({ x: feet[0], y: feet[1], z: feet[2] });
     controls.pitch = pitch;
@@ -521,6 +528,19 @@ window.__engine = {
     mode: 'gravity'
   }),
   dayPhase: () => dayNight(performance.now()).phase,
+  traffic: () =>
+    carFleet
+      ? { count: carFleet.count, moving: carFleet.moving, parked: carFleet.parked, diagnostics: carFleet.diagnostics() }
+      : { count: 0, moving: 0, parked: 0, diagnostics: [] },
+  sceneStats: () => {
+    let nodes = 0;
+    let instanced = 0;
+    scene.traverse((o) => {
+      nodes++;
+      if (o.isInstancedMesh) instanced++;
+    });
+    return { nodes, instanced };
+  },
   laya: () => ({
     ready: laya.ready,
     error: laya.error,
@@ -653,6 +673,7 @@ renderer.setAnimationLoop((now) => {
   if (dt > 0) fps += (1 / dt - fps) * 0.08;
 
   controls.update(dt);
+  if (carFleet) carFleet.update(dt);
   pollTools(now);
   const dn = applyAtmosphere(dt, now);
   renderer.render(scene, camera);
@@ -686,3 +707,10 @@ renderer.setAnimationLoop((now) => {
 });
 
 requestBuild(seed);
+
+let carFleet = null;
+createCarFleet(scene, seed)
+  .then((fleet) => {
+    carFleet = fleet;
+  })
+  .catch(() => {});

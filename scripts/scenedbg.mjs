@@ -1,32 +1,13 @@
 import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.dirname(fileURLToPath(new URL('../package.json', import.meta.url)));
 const CHROME = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const APP_PORT = 5314;
-const DEBUG_PORT = 9237;
+const APP_PORT = 5315;
+const DEBUG_PORT = 9238;
 const PROFILE = path.join(ROOT, '.chrome-shot');
-const OUT = path.join(ROOT, '.shots');
-const R = 64;
-const C = 96;
-const DEG = Math.PI / 180;
-
-const SHOTS = [
-  { name: 'street-n', lat: 0.4, lon: 10, yaw: 0, pitch: -0.12, eye: 1.7 },
-  { name: 'street-s', lat: 0.4, lon: 10, yaw: Math.PI, pitch: -0.12, eye: 1.7 },
-  { name: 'street-n2', lat: 0.4, lon: 55, yaw: 0, pitch: -0.12, eye: 1.7 },
-  { name: 'street-e', lat: 10, lon: 45.4, yaw: -Math.PI / 2, pitch: -0.12, eye: 1.7 },
-  { name: 'street-w', lat: 10, lon: 45.4, yaw: Math.PI / 2, pitch: -0.12, eye: 1.7 },
-  { name: 'avenue', lat: 0.4, lon: 12, yaw: 1.6, pitch: -0.08, eye: 1.7 },
-  { name: 'rooftops', lat: 6, lon: 8, yaw: 0.6, pitch: -0.5, eye: 14 },
-  { name: 'car-side', feet: [144.45, 120.37, 59.28], yaw: -1.8, pitch: -0.35 },
-  { name: 'car-top', feet: [144.21, 118.76, 54.39], yaw: 0.4, pitch: -1.2 },
-  { name: 'overview', lat: 8, lon: 8, yaw: 0.6, pitch: -0.65, eye: 34 },
-  { name: 'skyline', lat: 6, lon: 6, yaw: 0.9, pitch: -0.3, eye: 52 }
-];
 
 function killTree(pid) {
   spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
@@ -77,33 +58,19 @@ function createCdp(wsUrl) {
 
 async function evalJson(cdp, expression) {
   const out = await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
-  if (out.exceptionDetails) throw new Error(out.exceptionDetails.text);
+  if (out.exceptionDetails) throw new Error(JSON.stringify(out.exceptionDetails));
   return out.result.value;
-}
-
-function surface(latDeg, lonDeg, lift = 0.5) {
-  const lat = latDeg * DEG;
-  const lon = lonDeg * DEG;
-  const d = R + lift;
-  return [
-    Math.round((C + d * Math.cos(lat) * Math.cos(lon)) * 100) / 100,
-    Math.round((C + d * Math.sin(lat)) * 100) / 100,
-    Math.round((C + d * Math.cos(lat) * Math.sin(lon)) * 100) / 100
-  ];
 }
 
 let vite = null;
 let chrome = null;
 let cdp = null;
-
 try {
-  mkdirSync(OUT, { recursive: true });
   vite = spawn(process.execPath, [path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), '--port', String(APP_PORT), '--strictPort'], {
     cwd: ROOT,
     stdio: 'ignore'
   });
   await waitForHttp(`http://localhost:${APP_PORT}/`, 30000);
-
   chrome = spawn(
     CHROME,
     ['--headless', '--no-sandbox', `--user-data-dir=${PROFILE}`, `--remote-debugging-port=${DEBUG_PORT}`, '--window-size=1280,720', 'about:blank'],
@@ -127,33 +94,43 @@ try {
     if (ready) break;
     await sleep(500);
   }
-  await sleep(2500);
 
-  let traffic = null;
   const trafficDeadline = Date.now() + 20000;
+  let traffic = null;
   while (Date.now() < trafficDeadline) {
-    const t = await evalJson(cdp, 'JSON.stringify(window.__engine?.traffic?.() ?? null)').catch(() => null);
-    try {
-      traffic = t ? JSON.parse(t) : null;
-    } catch {
-      traffic = null;
-    }
-    if (traffic && traffic.count >= 4) break;
+    traffic = await evalJson(cdp, 'JSON.parse(JSON.stringify(window.__engine.traffic()))');
+    if (traffic.count >= 4) break;
     await sleep(500);
   }
-  console.log(`traffic: ${JSON.stringify(traffic)}`);
-
-  for (const shot of SHOTS) {
-    const feet = shot.feet ?? surface(shot.lat, shot.lon, Math.max(0.1, (shot.eye ?? 1.7) - 1.6));
-    const cam = await evalJson(cdp, `JSON.stringify(window.__engine.view(${JSON.stringify(feet)}, ${shot.yaw}, ${shot.pitch}))`);
-    await sleep(250);
-    const png = await cdp.send('Page.captureScreenshot', { format: 'png' });
-    const file = path.join(OUT, `${shot.name}.png`);
-    writeFileSync(file, Buffer.from(png.data, 'base64'));
-    console.log(`${shot.name}: cam ${cam} -> ${file}`);
-  }
+  const stats = await evalJson(cdp, 'JSON.parse(JSON.stringify(window.__engine.sceneStats()))');
+  const pos = await evalJson(cdp, 'JSON.stringify(window.__engine.pos())');
+  const v1 = await evalJson(cdp, 'JSON.stringify({p: window.__engine.view([161,112,96], 0, -1.35), f: window.__engine.camFwd(), pitch: window.__engine.pitch()})');
+  await sleep(100);
+  const v2 = await evalJson(cdp, 'JSON.stringify({p: window.__engine.pos(), f: window.__engine.camFwd(), pitch: window.__engine.pitch()})');
+  await sleep(1000);
+  const v3 = await evalJson(cdp, 'JSON.stringify({p: window.__engine.pos(), f: window.__engine.camFwd(), pitch: window.__engine.pitch()})');
+  const viewShot = await evalJson(cdp, 'JSON.stringify(window.__engine.view([143.5,118.42,55.01], 0, -1.5))');
+  await sleep(700);
+  const atCapture = await evalJson(cdp, 'JSON.stringify({p: window.__engine.pos(), f: window.__engine.camFwd(), pitch: window.__engine.pitch()})');
+  const png = await cdp.send('Page.captureScreenshot', { format: 'png' });
+  const { writeFileSync, mkdirSync } = await import('node:fs');
+  mkdirSync(path.join(ROOT, '.shots'), { recursive: true });
+  writeFileSync(path.join(ROOT, '.shots', 'dbg-cardirect.png'), Buffer.from(png.data, 'base64'));
+  const logs = await evalJson(
+    cdp,
+    "JSON.stringify(performance.getEntriesByType('resource').filter(e=>/glb|manifest|colormap/.test(e.name)).map(e=>({n:e.name.split('/').slice(-2).join('/'),s:e.transferSize,d:Math.round(e.duration)})))"
+  );
+  console.log('traffic:', JSON.stringify(traffic, null, 1));
+  console.log('scene:', JSON.stringify(stats));
+  console.log('camera:', pos);
+  console.log('view+0ms :', v1);
+  console.log('view+100ms:', v2);
+  console.log('view+1s   :', v3);
+  console.log('car view:', viewShot);
+  console.log('at capture:', atCapture);
+  console.log('resources:', logs);
 } catch (err) {
-  console.error(`FAIL: ${err.message}`);
+  console.error('FAIL:', err.message);
   process.exitCode = 1;
 } finally {
   cdp?.close();

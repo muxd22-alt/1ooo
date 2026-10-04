@@ -7,7 +7,7 @@ export const SUBS = PLANET.size / SUB_SIZE;
 
 const R = PLANET.radius;
 const DEG = Math.PI / 180;
-const ROAD_HALF = 5.5;
+export const ROAD_HALF = 5.5;
 const WALK_HALF = 8.5;
 const LINE_HALF = 0.75;
 const LAMP_NEAR = ROAD_HALF + 0.4;

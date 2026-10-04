@@ -7,7 +7,7 @@ import { BLOCK, BLOCK_PALETTE } from '../src/world/blocks.js';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, '.assets-src');
 const OUT = join(ROOT, 'data', 'prefabs');
-const MODELS = join(ROOT, 'data', 'models');
+const MODELS = join(ROOT, 'public', 'models');
 const COMMERCIAL = join(SRC, 'city-kit-commercial', 'Models', 'GLB format');
 const NATURE = join(SRC, 'nature-kit', 'Models', 'GLTF format');
 
