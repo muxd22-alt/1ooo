@@ -155,8 +155,11 @@ Aggregation rules: damage = flat sum x scalar product; RPM/weight/recoil/radius 
 | `Space` | Jump |
 | `F` | Toggle fly mode (`Shift` descends) |
 | `LMB` | Fire (RPM-gated) |
-| `1` – `3` | Loadout preset |
-| `R` | Reseed world |
+| `E` | Harvest voxel into carry (hold to repeat, max 10) |
+| `Q` | Place selected voxel against the aimed face |
+| `X` | Cycle selected carry material |
+| `1` – `3` | Loadout preset (seed-driven identity & parts) |
+| `R` | Reseed world (new city, theme, loadout) |
 
 ---
 

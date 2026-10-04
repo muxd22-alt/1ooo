@@ -1,9 +1,11 @@
 import * as THREE from 'three/webgpu';
 import './style.css';
-import { PLANET, SUB_SIZE } from './world/planet.js';
+import { PLANET, SUB_SIZE, planetIndex } from './world/planet.js';
 import { makeTheme } from './world/theme.js';
+import { BLOCK_NAMES } from './world/blocks.js';
+import { raycastVoxels } from './world/voxelOps.js';
 import { createChunkMaterial } from './render/chunkMaterial.js';
-import { PlanetControls } from './player/planetControls.js';
+import { PlanetControls, BODY_HEIGHTS } from './player/planetControls.js';
 import { loadPreset } from './game/weapons/loadout.js';
 import {
   TELEMETRY_INTERVAL_MS,
@@ -101,13 +103,24 @@ let opId = 0;
 let lastBuild = null;
 let theme = makeTheme(seed);
 let voxelsMirror = null;
-let weapon = loadPreset(1);
+let weapon = loadPreset(1, seed);
 let lastShotAt = -Infinity;
 let shots = 0;
 let hits = 0;
 let voxelsRemoved = 0;
 const RECOIL_CAMERA_SCALE = 0.12;
 const SHOT_MAX_DIST = 300;
+const TOOL_REACH = 9;
+const CARRY_LIMIT = 10;
+const HARVEST_COOLDOWN_MS = 130;
+const PLACE_COOLDOWN_MS = 110;
+
+const carry = { items: new Map(), total: 0, selected: 0 };
+const pendingEdits = new Map();
+const toolDir = new THREE.Vector3();
+let toolBusy = false;
+let nextHarvestAt = 0;
+let nextPlaceAt = 0;
 
 const worker = new Worker(new URL('./world/mesher.worker.js', import.meta.url), { type: 'module' });
 
@@ -185,6 +198,26 @@ applyTheme(theme);
 
 worker.onmessage = (event) => {
   const msg = event.data;
+
+  if (msg.type === 'edit') {
+    const resolve = pendingEdits.get(msg.op);
+    pendingEdits.delete(msg.op);
+    if (msg.ok && voxelsMirror) {
+      if (msg.cleared) for (let n = 0; n < msg.cleared.length; n++) voxelsMirror[msg.cleared[n]] = 0;
+      if (msg.set !== undefined) voxelsMirror[msg.set] = msg.material;
+    }
+    for (const chunk of msg.chunks) upsertChunkMesh(chunk);
+    if (lastBuild) {
+      const totals = worldTotals();
+      lastBuild.quads = totals.quads;
+      lastBuild.faces = totals.faces;
+      lastBuild.verts = totals.verts;
+      lastBuild.meshMs = msg.stats?.meshMs ?? lastBuild.meshMs;
+    }
+    resolve?.(msg);
+    return;
+  }
+
   if (msg.type !== 'built') return;
 
   if (msg.reason === 'shoot') {
@@ -290,6 +323,148 @@ setInterval(() => {
 
 controls.onAim = (dx, dy) => pushAimSample(telemetry, dx, dy);
 
+function carryAdd(id) {
+  if (id <= 0 || carry.total >= CARRY_LIMIT) return false;
+  carry.items.set(id, (carry.items.get(id) ?? 0) + 1);
+  carry.total++;
+  if (!carry.selected) carry.selected = id;
+  return true;
+}
+
+function carryTake(id) {
+  const n = carry.items.get(id);
+  if (!n) return false;
+  if (n <= 1) carry.items.delete(id);
+  else carry.items.set(id, n - 1);
+  carry.total--;
+  if (carry.selected === id && !carry.items.has(id)) {
+    carry.selected = [...carry.items.keys()].sort((a, b) => a - b)[0] ?? 0;
+  }
+  return true;
+}
+
+function cycleCarry() {
+  const ids = [...carry.items.keys()].sort((a, b) => a - b);
+  if (ids.length === 0) {
+    carry.selected = 0;
+    return;
+  }
+  carry.selected = ids[(ids.indexOf(carry.selected) + 1) % ids.length];
+}
+
+function resetCarry() {
+  carry.items.clear();
+  carry.total = 0;
+  carry.selected = 0;
+}
+
+function playerCells() {
+  const up = camera.up;
+  const cells = new Set();
+  for (const h of [...BODY_HEIGHTS, 1.6]) {
+    const x = Math.floor(controls.feet.x + up.x * h);
+    const y = Math.floor(controls.feet.y + up.y * h);
+    const z = Math.floor(controls.feet.z + up.z * h);
+    cells.add(planetIndex(x, y, z));
+  }
+  return cells;
+}
+
+function toolRay() {
+  const origin = camera.position;
+  const dir = camera.getWorldDirection(toolDir);
+  return raycastVoxels(
+    voxelsMirror,
+    PLANET.size,
+    PLANET.size,
+    PLANET.size,
+    [origin.x, origin.y, origin.z],
+    [dir.x, dir.y, dir.z],
+    TOOL_REACH
+  );
+}
+
+function requestEdit(type, payload) {
+  const id = ++opId;
+  return new Promise((resolve) => {
+    pendingEdits.set(id, resolve);
+    worker.postMessage({ type, id, ...payload });
+  });
+}
+
+async function harvestNow() {
+  if (toolBusy || !voxelsMirror || carry.total >= CARRY_LIMIT) return null;
+  const hit = toolRay();
+  if (!hit) return null;
+  const idx = planetIndex(hit.x, hit.y, hit.z);
+  if (voxelsMirror[idx] === 0) return null;
+  toolBusy = true;
+  try {
+    const res = await requestEdit('harvest', { idx });
+    if (res?.ok && carryAdd(res.material)) {
+      noteAction(telemetry);
+      return res;
+    }
+    return null;
+  } finally {
+    toolBusy = false;
+  }
+}
+
+async function placeNow() {
+  if (toolBusy || !voxelsMirror || carry.total <= 0 || !carry.selected) return null;
+  const hit = toolRay();
+  if (!hit) return null;
+  const nx = hit.point[0] - (hit.x + 0.5);
+  const ny = hit.point[1] - (hit.y + 0.5);
+  const nz = hit.point[2] - (hit.z + 0.5);
+  const ax = Math.abs(nx);
+  const ay = Math.abs(ny);
+  const az = Math.abs(nz);
+  let tx = hit.x;
+  let ty = hit.y;
+  let tz = hit.z;
+  if (ax >= ay && ax >= az) tx += Math.sign(nx) || 1;
+  else if (ay >= az) ty += Math.sign(ny) || 1;
+  else tz += Math.sign(nz) || 1;
+  if (tx < 0 || ty < 0 || tz < 0 || tx >= PLANET.size || ty >= PLANET.size || tz >= PLANET.size) {
+    return null;
+  }
+  const idx = planetIndex(tx, ty, tz);
+  if (voxelsMirror[idx] !== 0) return null;
+  if (playerCells().has(idx)) return null;
+  const material = carry.selected;
+  toolBusy = true;
+  try {
+    const res = await requestEdit('place', { idx, material });
+    if (res?.ok && carryTake(material)) {
+      noteAction(telemetry);
+      return res;
+    }
+    return null;
+  } finally {
+    toolBusy = false;
+  }
+}
+
+async function toolTest() {
+  const h = await harvestNow();
+  const carried = carry.total;
+  const p = h ? await placeNow() : null;
+  return { h: !!h, p: !!p, carried, carry: carry.total };
+}
+
+function pollTools(now) {
+  if (controls.keys.has('KeyE') && now >= nextHarvestAt) {
+    nextHarvestAt = now + HARVEST_COOLDOWN_MS;
+    harvestNow();
+  }
+  if (controls.keys.has('KeyQ') && now >= nextPlaceAt) {
+    nextPlaceAt = now + PLACE_COOLDOWN_MS;
+    placeNow();
+  }
+}
+
 function shoot(now) {
   if (chunkMeshes.size === 0 || now - lastShotAt < weapon.fireIntervalMs) return;
   lastShotAt = now;
@@ -325,6 +500,13 @@ window.__engine = {
   keys: () => [...controls.keys],
   stats: () => ({ shots, hits, voxelsRemoved, quads: lastBuild?.quads ?? 0 }),
   weapon: () => weapon,
+  carry: () => ({
+    total: carry.total,
+    limit: CARRY_LIMIT,
+    selected: carry.selected,
+    items: [...carry.items.entries()]
+  }),
+  toolTest: () => toolTest(),
   planet: () => ({
     size: PLANET.size,
     radius: PLANET.radius,
@@ -374,13 +556,20 @@ window.addEventListener('keydown', (event) => {
     shots = 0;
     hits = 0;
     voxelsRemoved = 0;
+    resetCarry();
     noteAction(telemetry);
     requestBuild((Math.random() * 0xffffffff) >>> 0);
+    weapon = loadPreset(weapon.index, seed);
+    lastShotAt = -Infinity;
+    return;
+  }
+  if (event.code === 'KeyX' && !event.repeat) {
+    cycleCarry();
     return;
   }
   const presetIndex = Number(event.key);
   if (presetIndex >= 1 && presetIndex <= 3) {
-    weapon = loadPreset(presetIndex);
+    weapon = loadPreset(presetIndex, seed);
     lastShotAt = -Infinity;
     noteAction(telemetry);
   }
@@ -457,6 +646,7 @@ renderer.setAnimationLoop((now) => {
   if (dt > 0) fps += (1 / dt - fps) * 0.08;
 
   controls.update(dt);
+  pollTools(now);
   const dn = applyAtmosphere(dt, now);
   renderer.render(scene, camera);
 
@@ -467,12 +657,14 @@ renderer.setAnimationLoop((now) => {
       ? `seed ${lastBuild.seed} · ${lastBuild.themeName} · ${clock} · gen ${lastBuild.genMs.toFixed(1)}ms · ` +
         `mesh ${lastBuild.meshMs.toFixed(1)}ms · ${lastBuild.faces.toLocaleString()} faces`
       : `building planet… seed ${seed}`;
+    const carryLabel = carry.total > 0 && carry.selected ? BLOCK_NAMES[carry.selected] ?? 'block' : 'empty';
     const gun =
-      `${weapon.name} [${weapon.partIds.map((id) => id.replace('part_', '')).join(' + ')}] · ` +
-      `dmg ${weapon.damage.toFixed(1)} · ${weapon.fireRateRPM.toFixed(0)} rpm · ` +
+      `${weapon.displayName} · ${weapon.name} · dmg ${weapon.damage.toFixed(1)} · ` +
+      `${weapon.fireRateRPM.toFixed(0)} rpm · ` +
       `recoil V${weapon.recoil.vertical.toFixed(2)}/H${weapon.recoil.horizontal.toFixed(2)} · ` +
       `weight ${weapon.weight.toFixed(1)}kg · r ${weapon.voxelDestructionRadius.toFixed(2)}m\n` +
-      `shots ${shots}/${hits} · voxels removed ${voxelsRemoved.toLocaleString()}`;
+      `shots ${shots}/${hits} · voxels removed ${voxelsRemoved.toLocaleString()} · ` +
+      `carry ${carry.total}/${CARRY_LIMIT} ${carryLabel}`;
     const ai = laya.error
       ? `laya ERROR: ${laya.error}`
       : `laya ${laya.ready ? 'ready' : 'loading…'} · intent ${laya.intent} · margin ${laya.margin.toFixed(2)} · ` +

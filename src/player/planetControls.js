@@ -14,7 +14,7 @@ const STEP_UP = 1.15;
 const STEP_DOWN = 1.05;
 const SKIN = 0.05;
 const AIR_CONTROL = 12;
-const BODY_HEIGHTS = [0.1, 0.85, 1.5];
+export const BODY_HEIGHTS = Object.freeze([0.1, 0.85, 1.5]);
 
 export class PlanetControls {
   constructor(camera, domElement) {
@@ -228,6 +228,8 @@ export class PlanetControls {
       this._jumpQueued = false;
     }
 
+    if (this.vUp > 0 || !this.grounded) this.vUp -= GRAVITY * dt;
+
     const move = this._move.copy(this.velH).multiplyScalar(dt);
     if (move.lengthSq() > 1e-12 && !this.canStand(this._cand.copy(this.feet).add(move))) {
       const df = move.dot(this.forwardH);
@@ -268,7 +270,6 @@ export class PlanetControls {
         this.grounded = true;
       } else {
         this.grounded = false;
-        this.vUp -= GRAVITY * dt;
         this.feet.addScaledVector(up, this.vUp * dt);
       }
     }

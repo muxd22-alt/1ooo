@@ -193,5 +193,44 @@ self.onmessage = (event) => {
       },
       [cleared.buffer]
     );
+    return;
+  }
+
+  if (msg.type === 'harvest' || msg.type === 'place') {
+    const fail = (reason) => postBuilt({ type: 'edit', op: msg.id, ok: false, reason, chunks: [] });
+    if (!store.voxels) return fail('no world');
+    const idx = msg.idx;
+    if (!(idx >= 0 && idx < store.voxels.length)) return fail('out of bounds');
+
+    let material;
+    if (msg.type === 'harvest') {
+      if (store.voxels[idx] === 0) return fail('no voxel');
+      material = store.voxels[idx];
+      store.voxels[idx] = 0;
+    } else {
+      material = msg.material;
+      if (store.voxels[idx] !== 0) return fail('cell occupied');
+      if (!(Number.isInteger(material) && material > 0 && material <= 255)) return fail('bad material');
+      store.voxels[idx] = material;
+    }
+
+    const x = idx % S;
+    const y = Math.floor(idx / S) % S;
+    const z = Math.floor(idx / (S * S));
+    const t = performance.now();
+    const chunks = subsAround([x + 0.5, y + 0.5, z + 0.5], 1).map(([i, j, k]) => meshSub(i, j, k));
+    const cleared = msg.type === 'harvest' ? new Uint32Array([idx]) : new Uint32Array(0);
+    const payload = {
+      type: 'edit',
+      op: msg.id,
+      ok: true,
+      reason: msg.type,
+      material,
+      chunks,
+      stats: { meshMs: performance.now() - t }
+    };
+    if (msg.type === 'harvest') payload.cleared = cleared;
+    else payload.set = idx;
+    postBuilt(payload, cleared.length ? [cleared.buffer] : []);
   }
 };

@@ -1,14 +1,16 @@
 import { BLOCK } from './blocks.js';
 
-export const PLANET = Object.freeze({ size: 192, center: 96, radius: 64, maxStruct: 16 });
+export const PLANET = Object.freeze({ size: 192, center: 96, radius: 64, maxStruct: 22 });
 export const SUB_SIZE = 48;
 export const SUBS = PLANET.size / SUB_SIZE;
 
 const R = PLANET.radius;
 const DEG = Math.PI / 180;
-const ROAD_HALF = 4.5;
-const WALK_HALF = 7.5;
+const ROAD_HALF = 5.5;
+const WALK_HALF = 8.5;
 const LINE_HALF = 0.75;
+const LAMP_NEAR = ROAD_HALF + 0.4;
+const LAMP_FAR = ROAD_HALF + 1.8;
 export const CITY_MAX_LAT = 45 + WALK_HALF / R / DEG;
 
 const SURF_HI = 0.6;
@@ -173,20 +175,18 @@ function lampMaterial(lat, lon, h, seed) {
   const m = Math.round(lon / P) * P;
   const dLonArc = Math.abs(lon - m) * Math.cos(lat) * R;
   const step = 12 * DEG;
-  let onLine = false;
-  if (dLatArc > WALK_HALF + 0.5 && dLonArc >= 4.7 && dLonArc <= 7.3) {
-    if (Math.abs(lat - Math.round(lat / step) * step) * R < 1.25) onLine = true;
+  let street = 0;
+  if (dLatArc > WALK_HALF + 0.5 && dLonArc >= LAMP_NEAR && dLonArc <= LAMP_FAR) {
+    if (Math.abs(lat - Math.round(lat / step) * step) * R < 1.25) street = Math.round(lon / P) + 5;
   }
-  if (!onLine && dLonArc > WALK_HALF + 0.5 && dLatArc >= 4.7 && dLatArc <= 7.3) {
-    if (Math.abs(lon - Math.round(lon / step) * step) * Math.cos(lat) * R < 1.25) onLine = true;
+  if (street === 0 && dLonArc > WALK_HALF + 0.5 && dLatArc >= LAMP_NEAR && dLatArc <= LAMP_FAR) {
+    if (Math.abs(lon - Math.round(lon / step) * step) * Math.cos(lat) * R < 1.25) {
+      street = -(Math.round(lat / P) + 3);
+    }
   }
-  if (!onLine) return 0;
+  if (street === 0) return 0;
   if (h <= 3.3) return BLOCK.LAMP_POST;
-  if (h <= 4.6) {
-    const k = Math.round(lat / step);
-    const l = Math.round(lon / step);
-    return LAMP_IDS[hash3i(k, l, seed ^ 0x10ff5eed) % LAMP_IDS.length];
-  }
+  if (h <= 4.6) return LAMP_IDS[hash3i(street, 0x5eed, seed ^ 0x10ff5eed) % LAMP_IDS.length];
   return 0;
 }
 
@@ -274,7 +274,7 @@ const MARKET_RECTS = Object.freeze([
 function towerMaterial(s, h, seed) {
   if (!inRect(s, TOWER_RECT)) return 0;
   const salt = slotSalt(s, 0);
-  const height = 7 + Math.floor(rand01(seed ^ 0x9b9b, salt, salt + 1) * 9);
+  const height = 11 + Math.floor(rand01(seed ^ 0x9b9b, salt, salt + 1) * 9);
   if (h > height) return 0;
   const neon = neonMaterial(s, h, TOWER_RECT, height, seed, salt);
   if (neon) return neon;
@@ -289,8 +289,8 @@ function twinMaterial(s, h, seed) {
   const salt = slotSalt(s, i);
   const height =
     i === 0
-      ? 6 + Math.floor(rand01(seed ^ 0x6101, salt, salt + 1) * 7)
-      : 4 + Math.floor(rand01(seed ^ 0x6202, salt, salt + 2) * 6);
+      ? 9 + Math.floor(rand01(seed ^ 0x6101, salt, salt + 1) * 9)
+      : 7 + Math.floor(rand01(seed ^ 0x6202, salt, salt + 2) * 6);
   if (h > height) return 0;
   const neon = neonMaterial(s, h, TWIN_RECTS[i], height, seed, salt * 2 + i);
   if (neon) return neon;
@@ -301,7 +301,7 @@ function rowMaterial(s, h, seed) {
   const i = rectIndex(s, ROW_RECTS);
   if (i < 0) return 0;
   const salt = slotSalt(s, i);
-  const height = 3 + Math.floor(rand01(seed ^ (0x3000 + i), salt, salt + i) * 4);
+  const height = 5 + Math.floor(rand01(seed ^ (0x3000 + i), salt, salt + i) * 4);
   if (h > height) return 0;
   const walls = [BLOCK.BRICK, BLOCK.WOOD, BLOCK.CONCRETE, BLOCK.METAL];
   const wall = walls[Math.floor(rand01(seed ^ (0x4000 + i), salt + i, salt) * walls.length)];
@@ -312,7 +312,7 @@ function cornersMaterial(s, h, seed) {
   const i = rectIndex(s, CORNER_RECTS);
   if (i < 0) return 0;
   const salt = slotSalt(s, i);
-  const height = 4 + Math.floor(rand01(seed ^ (0x5000 + i), salt + i * 7, salt + i * 3) * 6);
+  const height = 6 + Math.floor(rand01(seed ^ (0x5000 + i), salt + i * 7, salt + i * 3) * 6);
   if (h > height) return 0;
   if (i === 0) {
     const neon = neonMaterial(s, h, CORNER_RECTS[0], height, seed, salt);

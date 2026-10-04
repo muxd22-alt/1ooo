@@ -73,6 +73,37 @@ export const BLOCK_EMISSIVE = Object.freeze({
   [BLOCK.NEON_AMBER]: Object.freeze([1.0, 0.6, 0.15])
 });
 
+export const BLOCK_NAMES = Object.freeze({
+  [BLOCK.AIR]: 'Air',
+  [BLOCK.GRASS]: 'Grass',
+  [BLOCK.DIRT]: 'Dirt',
+  [BLOCK.STONE]: 'Stone',
+  [BLOCK.SAND]: 'Sand',
+  [BLOCK.ROAD]: 'Road',
+  [BLOCK.ROAD_LINE]: 'Road Line',
+  [BLOCK.SIDEWALK]: 'Sidewalk',
+  [BLOCK.BRICK]: 'Brick',
+  [BLOCK.CONCRETE]: 'Concrete',
+  [BLOCK.GLASS]: 'Glass',
+  [BLOCK.METAL]: 'Metal',
+  [BLOCK.WOOD]: 'Wood',
+  [BLOCK.LAMP_POST]: 'Lamp Post',
+  [BLOCK.LAMP_WARM]: 'Warm Lamp',
+  [BLOCK.LAMP_CYAN]: 'Cyan Lamp',
+  [BLOCK.LAMP_PINK]: 'Pink Lamp',
+  [BLOCK.LAMP_LIME]: 'Lime Lamp',
+  [BLOCK.LAMP_AMBER]: 'Amber Lamp',
+  [BLOCK.FENCE]: 'Fence',
+  [BLOCK.LEAVES]: 'Leaves',
+  [BLOCK.TRUNK]: 'Trunk',
+  [BLOCK.WATER]: 'Water',
+  [BLOCK.PLAZA]: 'Plaza',
+  [BLOCK.LOT]: 'Parking Lot',
+  [BLOCK.NEON_PINK]: 'Neon Pink',
+  [BLOCK.NEON_CYAN]: 'Neon Cyan',
+  [BLOCK.NEON_AMBER]: 'Neon Amber'
+});
+
 export function voxelIndex(x, y, z) {
   return x + CHUNK.x * (y + CHUNK.y * z);
 }

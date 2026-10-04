@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SLOT_TYPES, WEAPON_LIMITS, validateAssembly, aggregateWeapon, buildWeapon } from '../src/game/weapons/aggregate.js';
+import { loadPreset, PRESET_NAMES } from '../src/game/weapons/loadout.js';
+import { weaponIdentity } from '../src/game/weapons/identity.js';
 
 const ROOT = path.dirname(fileURLToPath(new URL('../package.json', import.meta.url)));
 const parts = JSON.parse(readFileSync(path.join(ROOT, 'data', 'weapon-parts.json'), 'utf8'));
@@ -169,5 +171,29 @@ const scaled = aggregateWeapon([
 ]);
 approx(scaled.damage, 16 * 0.75, 'flat sum x scalar product');
 
+const seenNames = new Set();
+const seenAssemblies = new Set();
+for (const s of [1337, 42, 90210, 7, 99, 2024, 555, 31337]) {
+  for (const idx of [1, 2, 3]) {
+    const preset = loadPreset(idx, s);
+    assert(preset !== null, `loadPreset(${idx}, ${s}) returns a weapon`);
+    assert(preset.name === PRESET_NAMES[idx], `preset ${idx} class name`);
+    assert(/^[A-Z]{2}-\d{2} [A-Z][a-z]+$/.test(preset.displayName), `${preset.displayName}: display name pattern`);
+    assert(preset.fireRateRPM >= WEAPON_LIMITS.fireRateRPM[0] && preset.fireRateRPM <= WEAPON_LIMITS.fireRateRPM[1], `preset ${idx} rpm in limits`);
+    assert(preset.voxelDestructionRadius > 0, `preset ${idx} has destruction radius`);
+    const again = loadPreset(idx, s);
+    assert(again.displayName === preset.displayName, `preset ${idx} name deterministic for seed ${s}`);
+    assert(again.partIds.join(',') === preset.partIds.join(','), `preset ${idx} assembly deterministic for seed ${s}`);
+    seenNames.add(preset.displayName);
+    seenAssemblies.add(preset.partIds.join(','));
+  }
+}
+assert(seenNames.size >= 12, `seeded identities vary across seeds (${seenNames.size} distinct)`);
+assert(seenAssemblies.size > 6, `seeded assemblies vary across seeds (${seenAssemblies.size} distinct)`);
+assert(loadPreset(1).displayName === weaponIdentity(1337, 1), 'default loadPreset seed is 1337');
+assert(loadPreset(9) === null, 'unknown preset index returns null');
+assert(weaponIdentity(1, 1) !== weaponIdentity(2, 1), 'identity changes with seed');
+
 console.log('OK  weapon schema + aggregation tests passed');
 console.log(`    ${parts.length} parts · ${validAssemblies}/36 valid assemblies · AR dmg ${ar.stats.damage.toFixed(2)} @ ${ar.stats.fireRateRPM} rpm`);
+console.log(`    ${seenNames.size} seeded identities · ${seenAssemblies.size} distinct assemblies · e.g. "${loadPreset(1, 1337).displayName}"`);

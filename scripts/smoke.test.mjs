@@ -212,6 +212,41 @@ try {
   }
   mark(`planet bounds OK (radial ${radial.toFixed(2)} ∈ [${lo}, ${hi}])`);
 
+  const jumpPre = JSON.parse(
+    (
+      await cdp.send('Runtime.evaluate', {
+        expression: 'JSON.stringify(window.__engine.pos())',
+        returnByValue: true
+      })
+    ).result.value
+  );
+  const preR = Math.hypot(jumpPre[0] - cx, jumpPre[1] - cy, jumpPre[2] - cz);
+  await cdp.send('Runtime.evaluate', {
+    expression: "document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true })); true",
+    returnByValue: true
+  });
+  await sleep(300);
+  await cdp.send('Runtime.evaluate', {
+    expression: "document.dispatchEvent(new KeyboardEvent('keyup', { code: 'Space', bubbles: true })); true",
+    returnByValue: true
+  });
+  await sleep(2000);
+  const jumpPost = JSON.parse(
+    (
+      await cdp.send('Runtime.evaluate', {
+        expression: 'JSON.stringify(window.__engine.pos())',
+        returnByValue: true
+      })
+    ).result.value
+  );
+  const postR = Math.hypot(jumpPost[0] - cx, jumpPost[1] - cy, jumpPost[2] - cz);
+  if (!(postR <= hi) || Math.abs(postR - preR) > 2) {
+    throw new Error(
+      `jump did not land: radial ${preR.toFixed(2)} -> ${postR.toFixed(2)} (bound [${lo}, ${hi}]) — gravity regression`
+    );
+  }
+  mark(`jump arc landed (radial ${preR.toFixed(2)} -> ${postR.toFixed(2)})`);
+
   const fireDeadline = Date.now() + 20000;
   let fireStats = null;
   while (Date.now() < fireDeadline) {
@@ -234,6 +269,28 @@ try {
     throw new Error(`destruction pipeline did not confirm a hit; stats: ${JSON.stringify(fireStats)}`);
   }
   mark(`destruction confirmed ${JSON.stringify(fireStats)}`);
+
+  const toolDeadline = Date.now() + 20000;
+  let toolResult = null;
+  while (Date.now() < toolDeadline) {
+    const res = await cdp.send('Runtime.evaluate', {
+      expression: 'window.__engine.toolTest().then((r) => JSON.stringify(r))',
+      returnByValue: true,
+      awaitPromise: true
+    });
+    if (res.exceptionDetails) {
+      throw new Error(
+        `toolTest threw: ${res.exceptionDetails.text} ${res.exceptionDetails.exception?.description ?? ''}`
+      );
+    }
+    toolResult = JSON.parse(res.result.value);
+    if (toolResult.h && toolResult.p && toolResult.carried >= 1) break;
+    await sleep(400);
+  }
+  if (!toolResult || !toolResult.h || !toolResult.p || toolResult.carried < 1) {
+    throw new Error(`carry/place pipeline did not confirm harvest+place; result: ${JSON.stringify(toolResult)}`);
+  }
+  mark(`carry/place OK (carried ${toolResult.carried} → ${toolResult.carry})`);
 
   const layaDeadline = Date.now() + 90000;
   let layaState = null;

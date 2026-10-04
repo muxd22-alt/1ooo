@@ -3,21 +3,21 @@ export const INTENTS = Object.freeze(['AGGRESSIVE', 'HARVESTER', 'CAMPER']);
 export const INTENT_DIRECTIVES = Object.freeze({
   AGGRESSIVE: Object.freeze({
     npc: 'cover-seeking bots, suppressive voxel barriers, crossfire vectors, bounty events',
-    fog: 0.0035,
+    fog: 0.0024,
     sky: 0x9ec4e8,
     sun: 3.6,
     hemi: 1.55
   }),
   HARVESTER: Object.freeze({
     npc: 'stealth flanks from occluded angles, subterranean assault events',
-    fog: 0.005,
+    fog: 0.0032,
     sky: 0x8fb8de,
     sun: 3.0,
     hemi: 1.4
   }),
   CAMPER: Object.freeze({
     npc: 'smoke cover deployment, subterranean tunneling, volumetric fog and night shifts',
-    fog: 0.016,
+    fog: 0.0075,
     sky: 0x2f3b52,
     sun: 0.9,
     hemi: 0.6
