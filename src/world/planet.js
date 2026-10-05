@@ -14,7 +14,7 @@ const LAMP_NEAR = ROAD_HALF + 0.4;
 const LAMP_FAR = ROAD_HALF + 1.8;
 export const CITY_MAX_LAT = 45 + WALK_HALF / R / DEG;
 
-const SURF_HI = 0.6;
+export const SURF_HI = 0.6;
 const STRUCT_LO = -2.4;
 const FX0 = 0.21;
 const FX1 = 0.79;

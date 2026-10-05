@@ -1,4 +1,4 @@
-import { PLANET, ROAD_HALF, WALK_HALF, CITY_MAX_LAT } from './planet.js';
+import { PLANET, ROAD_HALF, WALK_HALF, CITY_MAX_LAT, SURF_HI } from './planet.js';
 import { BLOCK } from './blocks.js';
 
 const STEP = 0.5;
@@ -11,10 +11,14 @@ const WALK_FADE = 0.7;
 const DEG = Math.PI / 180;
 const GRID = Math.PI / 4;
 const R = PLANET.radius;
+const SPHERE_R = R + SURF_HI;
 const PREFAB_MIN = 32;
 
-function structural(v) {
-  return (v >= BLOCK.NEON_PINK && v <= BLOCK.NEON_AMBER) || v >= PREFAB_MIN;
+function passThrough(v) {
+  if (v >= PREFAB_MIN) return true;
+  if (v >= BLOCK.NEON_PINK && v <= BLOCK.NEON_AMBER) return true;
+  return v === BLOCK.FENCE || v === BLOCK.LAMP_POST || (v >= BLOCK.LAMP_WARM && v <= BLOCK.LAMP_AMBER) ||
+    v === BLOCK.LEAVES || v === BLOCK.TRUNK;
 }
 
 export function createDisplace(voxels, size, center, radius, memo = new Map()) {
@@ -47,16 +51,26 @@ export function createDisplace(voxels, size, center, radius, memo = new Map()) {
     if (hit !== undefined) return hit;
     let r = radius + 27;
     let result = NaN;
-    let skipped = false;
+    let air = radius + 27;
     while (r > rMin) {
       r -= STEP;
       const v = get(Math.floor(cx + ux * r), Math.floor(cy + uy * r), Math.floor(cz + uz * r));
-      if (v === 0) continue;
-      if (structural(v)) {
-        skipped = true;
+      if (v === 0) {
+        air = r;
         continue;
       }
-      result = skipped ? NaN : r + STEP * 0.5;
+      if (passThrough(v)) {
+        air = r;
+        continue;
+      }
+      let solid = r;
+      for (let i = 0; i < 6 && air - solid > 0.0625; i++) {
+        const mid = (solid + air) * 0.5;
+        const m = get(Math.floor(cx + ux * mid), Math.floor(cy + uy * mid), Math.floor(cz + uz * mid));
+        if (m !== 0 && !passThrough(m)) solid = mid;
+        else air = mid;
+      }
+      result = (solid + air) * 0.5;
       break;
     }
     memo.set(key, result);
@@ -164,13 +178,24 @@ export function createDisplace(voxels, size, center, radius, memo = new Map()) {
       n++;
     }
     if (!n) return 1;
+    const measured = sum / n;
 
-    let delta = (sum / n - r) * STRENGTH;
-    if (delta > MAX_DELTA) delta = MAX_DELTA;
-    else if (delta < -MAX_DELTA) delta = -MAX_DELTA;
+    const vid = get(Math.floor(wx), Math.floor(wy), Math.floor(wz));
+    if (passThrough(vid) && r - measured > 0.35) return 1;
+
+    let w = (Math.abs(measured - SPHERE_R) - 0.4) / 0.4;
+    if (w < 0) w = 0;
+    else if (w > 1) w = 1;
+    const target = SPHERE_R + (measured - SPHERE_R) * w;
+    const str = 1 - (1 - STRENGTH) * w;
+    const maxD = MAX_DELTA + 0.55 * (1 - w);
+    let delta = (target - r) * str;
+    if (delta > maxD) delta = maxD;
+    else if (delta < -maxD) delta = -maxD;
     const lat = Math.asin(Math.max(-1, Math.min(1, dy / r)));
     delta += surfaceOffset(lat, Math.atan2(dz, dx));
-    if (delta > MAX_DELTA + SIDE_RISE) delta = MAX_DELTA + SIDE_RISE;
+    if (delta > maxD + SIDE_RISE) delta = maxD + SIDE_RISE;
+    else if (delta < -maxD - SIDE_RISE) delta = -maxD - SIDE_RISE;
     if (Math.abs(delta) < 1e-4) return 1;
     return (r + delta) / r;
   }
