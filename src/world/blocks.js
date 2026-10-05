@@ -107,3 +107,10 @@ export const BLOCK_NAMES = Object.freeze({
 export function voxelIndex(x, y, z) {
   return x + CHUNK.x * (y + CHUNK.y * z);
 }
+
+export function isStructureId(v) {
+  if (v >= 32) return true;
+  if (v >= BLOCK.NEON_PINK && v <= BLOCK.NEON_AMBER) return true;
+  return v === BLOCK.FENCE || v === BLOCK.LAMP_POST || (v >= BLOCK.LAMP_WARM && v <= BLOCK.LAMP_AMBER) ||
+    v === BLOCK.LEAVES || v === BLOCK.TRUNK;
+}

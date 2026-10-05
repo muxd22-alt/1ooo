@@ -1,5 +1,5 @@
 import { PLANET, ROAD_HALF, WALK_HALF, CITY_MAX_LAT, SURF_HI } from './planet.js';
-import { BLOCK } from './blocks.js';
+import { isStructureId } from './blocks.js';
 
 const STEP = 0.5;
 const TAP = 5.5;
@@ -12,14 +12,6 @@ const DEG = Math.PI / 180;
 const GRID = Math.PI / 4;
 const R = PLANET.radius;
 const SPHERE_R = R + SURF_HI;
-const PREFAB_MIN = 32;
-
-function passThrough(v) {
-  if (v >= PREFAB_MIN) return true;
-  if (v >= BLOCK.NEON_PINK && v <= BLOCK.NEON_AMBER) return true;
-  return v === BLOCK.FENCE || v === BLOCK.LAMP_POST || (v >= BLOCK.LAMP_WARM && v <= BLOCK.LAMP_AMBER) ||
-    v === BLOCK.LEAVES || v === BLOCK.TRUNK;
-}
 
 export function createDisplace(voxels, size, center, radius, memo = new Map()) {
   const [cx, cy, cz] = center;
@@ -59,7 +51,7 @@ export function createDisplace(voxels, size, center, radius, memo = new Map()) {
         air = r;
         continue;
       }
-      if (passThrough(v)) {
+      if (isStructureId(v)) {
         air = r;
         continue;
       }
@@ -67,7 +59,7 @@ export function createDisplace(voxels, size, center, radius, memo = new Map()) {
       for (let i = 0; i < 6 && air - solid > 0.0625; i++) {
         const mid = (solid + air) * 0.5;
         const m = get(Math.floor(cx + ux * mid), Math.floor(cy + uy * mid), Math.floor(cz + uz * mid));
-        if (m !== 0 && !passThrough(m)) solid = mid;
+        if (m !== 0 && !isStructureId(m)) solid = mid;
         else air = mid;
       }
       result = (solid + air) * 0.5;
@@ -181,7 +173,7 @@ export function createDisplace(voxels, size, center, radius, memo = new Map()) {
     const measured = sum / n;
 
     const vid = get(Math.floor(wx), Math.floor(wy), Math.floor(wz));
-    if (passThrough(vid) && r - measured > 0.35) return 1;
+    if (isStructureId(vid) && r - measured > 0.35) return 1;
 
     let w = (Math.abs(measured - SPHERE_R) - 0.4) / 0.4;
     if (w < 0) w = 0;

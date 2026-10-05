@@ -152,7 +152,7 @@ try {
       console.log(`CON: ${e.args.map((a) => a.value ?? '').join(' ').slice(0, 260)}`);
     }
   });
-  await cdp.send('Page.navigate', { url: `http://localhost:${APP_PORT}/?phase=0.25&seed=1337` });
+  await cdp.send('Page.navigate', { url: `http://localhost:${APP_PORT}/?phase=0.25&seed=${process.env.SEED || '1337'}` });
 
   const deadline = Date.now() + 60000;
   for (;;) {

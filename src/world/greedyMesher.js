@@ -1,4 +1,4 @@
-import { BLOCK_EMISSIVE, BLOCK_PALETTE } from './blocks.js';
+import { BLOCK_EMISSIVE, BLOCK_PALETTE, isStructureId } from './blocks.js';
 
 const PALETTE_FALLBACK = [1, 0, 1];
 const NO_EMISSIVE = [0, 0, 0];
@@ -117,12 +117,12 @@ export function greedyMesh(voxels, sx, sy, sz, opts = {}) {
     cS[d] = airLayer;
     cS[u] = uOut;
     cS[v] = vIn;
-    const s1 = at(cS[0], cS[1], cS[2]) !== 0;
+    const s1 = isStructureId(at(cS[0], cS[1], cS[2]));
     cS[u] = uIn;
     cS[v] = vOut;
-    const s2 = at(cS[0], cS[1], cS[2]) !== 0;
+    const s2 = isStructureId(at(cS[0], cS[1], cS[2]));
     cS[u] = uOut;
-    const sc = at(cS[0], cS[1], cS[2]) !== 0;
+    const sc = isStructureId(at(cS[0], cS[1], cS[2]));
     return AO_LEVELS[s1 && s2 ? 0 : 3 - ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (sc ? 1 : 0))];
   }
 
@@ -154,9 +154,45 @@ export function greedyMesh(voxels, sx, sy, sz, opts = {}) {
     pushV(pC);
     pushV(pD);
 
-    const n = [0, 0, 0];
-    n[d] = dir;
-    for (let k = 0; k < 4; k++) normals.push(n[0], n[1], n[2]);
+    let nx = d === 0 ? 1 : 0;
+    let ny = d === 1 ? 1 : 0;
+    let nz = d === 2 ? 1 : 0;
+    if (dir < 0) {
+      nx = -nx;
+      ny = -ny;
+      nz = -nz;
+    }
+    if (displace) {
+      const s = vertCount * 12;
+      const ax = positions[s];
+      const ay = positions[s + 1];
+      const az = positions[s + 2];
+      let v1x;
+      let v1y;
+      let v1z;
+      if (dir > 0) {
+        v1x = positions[s + 3] - ax;
+        v1y = positions[s + 4] - ay;
+        v1z = positions[s + 5] - az;
+      } else {
+        v1x = positions[s + 9] - ax;
+        v1y = positions[s + 10] - ay;
+        v1z = positions[s + 11] - az;
+      }
+      const v2x = positions[s + 6] - ax;
+      const v2y = positions[s + 7] - ay;
+      const v2z = positions[s + 8] - az;
+      const cx2 = v1y * v2z - v1z * v2y;
+      const cy2 = v1z * v2x - v1x * v2z;
+      const cz2 = v1x * v2y - v1y * v2x;
+      const len = Math.hypot(cx2, cy2, cz2);
+      if (len > 1e-9) {
+        nx = cx2 / len;
+        ny = cy2 / len;
+        nz = cz2 / len;
+      }
+    }
+    for (let k = 0; k < 4; k++) normals.push(nx, ny, nz);
 
     if (useAO) {
       const airLayer = dir > 0 ? plane : plane - 1;

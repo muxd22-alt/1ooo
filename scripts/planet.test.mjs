@@ -248,7 +248,7 @@ for (let v = 0; v < haloMesh.verts; v++) {
   const aoGrid = new Uint8Array(3 * 3 * 3);
   const ai = (x, y, z) => x + 3 * (y + 3 * z);
   aoGrid[ai(1, 1, 1)] = BLOCK.STONE;
-  aoGrid[ai(2, 2, 1)] = BLOCK.STONE;
+  aoGrid[ai(2, 2, 1)] = BLOCK.LAMP_POST;
   const mesh = greedyMesh(aoGrid, 3, 3, 3, { ao: true });
   const mat = BLOCK_PALETTE[BLOCK.STONE];
   const eps = 1e-6;

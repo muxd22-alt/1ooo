@@ -1,5 +1,5 @@
 import { MeshStandardNodeMaterial } from 'three/webgpu';
-import { attribute, clamp, float, mix, positionWorld, uniform, vec3 } from 'three/tsl';
+import { attribute, clamp, float, mix, mx_noise_float, positionWorld, uniform, vec3 } from 'three/tsl';
 import { PLANET } from '../world/planet.js';
 
 export function createChunkMaterial() {
@@ -10,7 +10,11 @@ export function createChunkMaterial() {
   const height = clamp(positionWorld.y.sub(float(PLANET.center - PLANET.radius)).div(span), 0.0, 1.0);
   const skyTint = mix(vec3(0.86, 0.91, 1.0), vec3(1.08, 1.03, 0.94), height);
 
-  material.colorNode = albedo.mul(skyTint);
+  const mottle = mx_noise_float(positionWorld.mul(0.55)).mul(0.055);
+  const grain = mx_noise_float(positionWorld.mul(7.0)).mul(0.02);
+  const detail = float(1.0).add(mottle).add(grain);
+
+  material.colorNode = albedo.mul(skyTint).mul(detail);
 
   const nightGlow = uniform(0.15);
   material.emissiveNode = attribute('emissive', 'vec3').mul(nightGlow);
