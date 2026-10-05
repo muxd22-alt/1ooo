@@ -1,8 +1,8 @@
 import { PLANET, ROAD_HALF, WALK_HALF, CITY_MAX_LAT } from './planet.js';
+import { BLOCK } from './blocks.js';
 
 const STEP = 0.5;
-const TAP = 1.4;
-const RAW_SKIP = 3;
+const TAP = 5.5;
 const TAP_CLAMP = 1;
 const STRENGTH = 0.82;
 const MAX_DELTA = 0.45;
@@ -11,6 +11,11 @@ const WALK_FADE = 0.7;
 const DEG = Math.PI / 180;
 const GRID = Math.PI / 4;
 const R = PLANET.radius;
+const PREFAB_MIN = 32;
+
+function structural(v) {
+  return (v >= BLOCK.NEON_PINK && v <= BLOCK.NEON_AMBER) || v >= PREFAB_MIN;
+}
 
 export function createDisplace(voxels, size, center, radius, memo = new Map()) {
   const [cx, cy, cz] = center;
@@ -42,12 +47,17 @@ export function createDisplace(voxels, size, center, radius, memo = new Map()) {
     if (hit !== undefined) return hit;
     let r = radius + 27;
     let result = NaN;
+    let skipped = false;
     while (r > rMin) {
       r -= STEP;
-      if (get(Math.floor(cx + ux * r), Math.floor(cy + uy * r), Math.floor(cz + uz * r)) !== 0) {
-        result = r + STEP * 0.5;
-        break;
+      const v = get(Math.floor(cx + ux * r), Math.floor(cy + uy * r), Math.floor(cz + uz * r));
+      if (v === 0) continue;
+      if (structural(v)) {
+        skipped = true;
+        continue;
       }
+      result = skipped ? NaN : r + STEP * 0.5;
+      break;
     }
     memo.set(key, result);
     return result;
@@ -124,7 +134,6 @@ export function createDisplace(voxels, size, center, radius, memo = new Map()) {
     taps[4][1] = wy - t2y * TAP;
     taps[4][2] = wz - t2z * TAP;
 
-    let raw = 0;
     let rawN = 0;
     for (let i = 0; i < 5; i++) {
       const ddx = taps[i][0] - cx;
@@ -139,11 +148,9 @@ export function createDisplace(voxels, size, center, radius, memo = new Map()) {
       const suz = ddz / dr;
       const sr = columnRadius(sux, suy, suz, dirKey(sux, suy, suz));
       srs[i] = sr;
-      if (Number.isNaN(sr)) continue;
-      raw += sr;
-      rawN++;
+      if (!Number.isNaN(sr)) rawN++;
     }
-    if (rawN < 3 || Math.abs(raw / rawN - r) > RAW_SKIP) return 1;
+    if (rawN < 3) return 1;
 
     let sum = 0;
     let n = 0;

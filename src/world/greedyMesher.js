@@ -13,6 +13,9 @@ export function greedyMesh(voxels, sx, sy, sz, opts = {}) {
   const cellSplit = !!opts.cellSplit;
   const displace = opts.displace || null;
   const offset = opts.offset || [0, 0, 0];
+  const structs = opts.structs || null;
+  const structOrigin = opts.structOrigin || [0, 0, 0];
+  const structSize = opts.structSize || 0;
 
   const dims = [sx, sy, sz];
   const positions = [];
@@ -24,8 +27,17 @@ export function greedyMesh(voxels, sx, sy, sz, opts = {}) {
   let vertCount = 0;
   let faceCount = 0;
 
-  const at = (x, y, z) =>
-    x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz ? 0 : voxels[x + sx * (y + sy * z)];
+  const at = (x, y, z) => {
+    if (x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz) return 0;
+    if (structs) {
+      const wx = x + structOrigin[0];
+      const wy = y + structOrigin[1];
+      const wz = z + structOrigin[2];
+      if (wx < 0 || wy < 0 || wz < 0 || wx >= structSize || wy >= structSize || wz >= structSize) return 0;
+      if (structs[wx + structSize * (wy + structSize * wz)]) return 0;
+    }
+    return voxels[x + sx * (y + sy * z)];
+  };
 
   const inCore = (x, y, z) =>
     x >= core[0] && x < core[3] && y >= core[1] && y < core[4] && z >= core[2] && z < core[5];

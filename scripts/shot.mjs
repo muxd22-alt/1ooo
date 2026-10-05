@@ -142,7 +142,7 @@ try {
   });
   const url =
     `http://localhost:${APP_PORT}/?phase=${process.env.NIGHT ? '0.75' : '0.25'}` +
-    (process.env.MENU ? '' : '&seed=1337') +
+    (process.env.MENU ? '' : `&seed=${process.env.SEED || '1337'}`) +
     (process.env.CANARY ? '&canary=1' : '') +
     '&flashhold=450&tracerhold=1500';
   await cdp.send('Page.navigate', { url });
@@ -176,6 +176,20 @@ try {
   const sig = await evalJson(cdp, 'JSON.stringify(window.__engine?.signals?.() ?? null)').catch(() => null);
   console.log(`signals: ${sig}`);
 
+  let city = null;
+  const cityDeadline = Date.now() + 30000;
+  while (Date.now() < cityDeadline) {
+    const c = await evalJson(cdp, 'JSON.stringify(window.__engine?.city?.() ?? null)').catch(() => null);
+    try {
+      city = c ? JSON.parse(c) : null;
+    } catch {
+      city = null;
+    }
+    if (city) break;
+    await sleep(500);
+  }
+  console.log(`city: ${JSON.stringify(city)}`);
+
   const atmo = await evalJson(
     cdp,
     "JSON.stringify({ vig: document.getElementById('vignette')?.style.opacity, atmo: window.__engine?.laya?.()?.atmo, tr: window.__engine?.tracers?.(), st: window.__engine?.stats?.() })"
@@ -195,7 +209,8 @@ try {
       console.log(`tracer pre-capture: ${pre}`);
     }
     const png = await cdp.send('Page.captureScreenshot', { format: 'png' });
-    const file = path.join(OUT, `${shot.name}.png`);
+    const seedTag = process.env.SEED ? `s${process.env.SEED}-` : '';
+    const file = path.join(OUT, `${seedTag}${shot.name}.png`);
     writeFileSync(file, Buffer.from(png.data, 'base64'));
     if (shot.fire) {
       const dbg = await evalJson(cdp, 'JSON.stringify(window.__engine.viewmodel())').catch(() => null);

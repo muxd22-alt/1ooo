@@ -62,6 +62,14 @@ const ENTRIES = [
 const CARS = ['sedan', 'taxi', 'police', 'suv', 'van', 'hatchback-sports', 'delivery', 'ambulance', 'race', 'truck'];
 const CAR_SRC = join(SRC, 'car-kit', 'Models', 'GLB format');
 
+const CITY = [
+  ...'abcde'.split('').map((c) => `building-skyscraper-${c}`),
+  ...'abcdefghijklmn'.split('').map((c) => `building-${c}`),
+  ...'abcdefghijklmn'.split('').map((c) => `low-detail-building-${c}`),
+  'low-detail-building-wide-a',
+  'low-detail-building-wide-b'
+];
+
 function readPng(buf) {
   if (buf.readUInt32BE(0) !== 0x89504e47) throw new Error('not png');
   let off = 8;
@@ -534,7 +542,43 @@ for (const gun of GUNS) {
 copyFileSync(join(GUN_SRC, 'Textures', 'colormap.png'), join(gunsOut, 'Textures', 'colormap.png'));
 
 const io = new NodeIO();
-const glbs = [...CARS.map((c) => join(carsOut, `${c}.glb`)), ...GUNS.map((g) => join(gunsOut, `${g.name}.glb`))];
+const cityOut = join(MODELS, 'city');
+mkdirSync(join(cityOut, 'Textures'), { recursive: true });
+const city = [];
+for (const name of CITY) {
+  const src = join(COMMERCIAL, `${name}.glb`);
+  copyFileSync(src, join(cityOut, `${name}.glb`));
+  const tris = gatherTriangles(src);
+  if (!tris.length) throw new Error(`no triangles: ${name}`);
+  const min = [Infinity, Infinity, Infinity];
+  const max = [-Infinity, -Infinity, -Infinity];
+  for (const t of tris) {
+    for (const p of t.pts) {
+      for (let k = 0; k < 3; k++) {
+        if (p[k] < min[k]) min[k] = p[k];
+        if (p[k] > max[k]) max[k] = p[k];
+      }
+    }
+  }
+  const size = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
+  if (size.some((v) => !(v > 0))) throw new Error(`bad bbox: ${name}`);
+  city.push({
+    name,
+    w: +size[0].toFixed(3),
+    h: +size[1].toFixed(3),
+    d: +size[2].toFixed(3),
+    ox: +((min[0] + max[0]) / 2).toFixed(3),
+    oy: +min[1].toFixed(3),
+    oz: +((min[2] + max[2]) / 2).toFixed(3)
+  });
+}
+copyFileSync(join(COMMERCIAL, 'Textures', 'colormap.png'), join(cityOut, 'Textures', 'colormap.png'));
+
+const glbs = [
+  ...CARS.map((c) => join(carsOut, `${c}.glb`)),
+  ...GUNS.map((g) => join(gunsOut, `${g.name}.glb`)),
+  ...CITY.map((n) => join(cityOut, `${n}.glb`))
+];
 let bytesBefore = 0;
 let bytesAfter = 0;
 for (const glb of glbs) {
@@ -546,8 +590,8 @@ for (const glb of glbs) {
 }
 console.log(`gltf-transform: dedup+prune ${glbs.length} glbs, ${(bytesBefore / 1e6).toFixed(2)} -> ${(bytesAfter / 1e6).toFixed(2)} MB`);
 
-writeFileSync(join(MODELS, 'manifest.json'), JSON.stringify({ cars: CARS, guns: GUNS.map((g) => g.name) }, null, 2));
-console.log(`cars: copied ${CARS.length} glbs, guns: copied ${GUNS.length} glbs`);
+writeFileSync(join(MODELS, 'manifest.json'), JSON.stringify({ cars: CARS, guns: GUNS.map((g) => g.name), city }, null, 2));
+console.log(`cars: copied ${CARS.length} glbs, guns: copied ${GUNS.length} glbs, city: copied ${CITY.length} glbs`);
 
 const PARTICLES = join(SRC, 'particle-pack', 'PNG (Transparent)');
 mkdirSync(join(ROOT, 'public', 'tex'), { recursive: true });

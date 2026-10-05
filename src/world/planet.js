@@ -146,6 +146,35 @@ export function slotAt(lat, lon, seed) {
   return s ? { ...s } : null;
 }
 
+export function* cityPlots(seed) {
+  for (let cellI = 0; cellI < 8; cellI++) {
+    for (let cellJ = 0; cellJ < 2; cellJ++) {
+      for (let sI = 0; sI < 3; sI++) {
+        for (let sJ = 0; sJ < 3; sJ++) {
+          const fx = FX0 + (sI + 0.5) * SLOT_W;
+          const fy = FY0 + (sJ + 0.5) * SLOT_H;
+          const latDeg = cellJ * 45 - 45 + fy * 45;
+          const lonDeg = cellI * 45 - 180 + fx * 45;
+          const lat = latDeg * DEG;
+          const lon = lonDeg * DEG;
+          const s = slotAt(lat, lon, seed);
+          if (!s || !BUILDING_KINDS.has(s.kind)) continue;
+          yield {
+            lat,
+            lon,
+            kind: s.kind,
+            salt: slotSalt(s, 0),
+            slotWvox: s.slotWvox,
+            slotHvox: s.slotHvox,
+            footW: (BUILDING_RECT[1] - BUILDING_RECT[0]) * s.slotWvox,
+            footD: (BUILDING_RECT[3] - BUILDING_RECT[2]) * s.slotHvox
+          };
+        }
+      }
+    }
+  }
+}
+
 function surfaceClass(cls, lat) {
   switch (cls) {
     case 'cross':
@@ -218,6 +247,8 @@ function neonMaterial(s, h, rect, height, seed, salt) {
 }
 
 const BUILDING_RECT = Object.freeze([0.14, 0.86, 0.14, 0.86]);
+
+const BUILDING_KINDS = new Set(['tower', 'twin', 'row', 'corners', 'market']);
 
 function buildingMaterial(s, h, seed) {
   const pool = structurePool(s.kind);
@@ -356,7 +387,7 @@ function slotSurface(s, h) {
   }
 }
 
-export function generatePlanet(seed) {
+export function generatePlanet(seed, structs = null) {
   const S = PLANET.size;
   const C = PLANET.center;
   const voxels = new Uint8Array(S * S * S);
@@ -389,6 +420,7 @@ export function generatePlanet(seed) {
           const s = fillSlot(lat, lon, seed);
           if (s) {
             mat = slotStructure(s, h, seed);
+            if (mat !== 0 && structs !== null && BUILDING_KINDS.has(s.kind)) structs[idx] = 1;
             if (!mat && h <= SURF_HI) mat = slotSurface(s, h);
           } else if (h <= SURF_HI) {
             mat = BLOCK.SIDEWALK;

@@ -15,5 +15,322 @@
     "ar",
     "smg",
     "dmr"
+  ],
+  "city": [
+    {
+      "name": "building-skyscraper-a",
+      "w": 1.36,
+      "h": 2.88,
+      "d": 1.36,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-skyscraper-b",
+      "w": 1.36,
+      "h": 4.48,
+      "d": 1.36,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-skyscraper-c",
+      "w": 1.28,
+      "h": 4.08,
+      "d": 1.388,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-skyscraper-d",
+      "w": 1.28,
+      "h": 5.47,
+      "d": 1.388,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-skyscraper-e",
+      "w": 1.295,
+      "h": 4.08,
+      "d": 1.242,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-a",
+      "w": 0.884,
+      "h": 1.293,
+      "d": 0.94,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-b",
+      "w": 0.97,
+      "h": 1.293,
+      "d": 0.94,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-c",
+      "w": 0.884,
+      "h": 0.893,
+      "d": 1.09,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-d",
+      "w": 0.84,
+      "h": 1.293,
+      "d": 0.9,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-e",
+      "w": 1.64,
+      "h": 0.893,
+      "d": 1.008,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-f",
+      "w": 0.84,
+      "h": 1.693,
+      "d": 1.03,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-g",
+      "w": 0.97,
+      "h": 1.693,
+      "d": 0.922,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-h",
+      "w": 0.884,
+      "h": 1.293,
+      "d": 1.008,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-i",
+      "w": 1.24,
+      "h": 1.68,
+      "d": 1.302,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-j",
+      "w": 2.084,
+      "h": 1.693,
+      "d": 1.34,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-k",
+      "w": 2.084,
+      "h": 1.47,
+      "d": 0.942,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-l",
+      "w": 1.37,
+      "h": 2.27,
+      "d": 1.402,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-m",
+      "w": 1.24,
+      "h": 3.15,
+      "d": 1.242,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "building-n",
+      "w": 2.32,
+      "h": 2.48,
+      "d": 1.82,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "low-detail-building-a",
+      "w": 0.5,
+      "h": 2,
+      "d": 0.5,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "low-detail-building-b",
+      "w": 0.5,
+      "h": 2.225,
+      "d": 0.5,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "low-detail-building-c",
+      "w": 0.5,
+      "h": 2.25,
+      "d": 0.5,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "low-detail-building-d",
+      "w": 0.5,
+      "h": 1.75,
+      "d": 0.5,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "low-detail-building-e",
+      "w": 0.5,
+      "h": 1.8,
+      "d": 0.5,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "low-detail-building-f",
+      "w": 0.5,
+      "h": 2,
+      "d": 0.5,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "low-detail-building-g",
+      "w": 0.5,
+      "h": 2,
+      "d": 0.5,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "low-detail-building-h",
+      "w": 0.5,
+      "h": 2.1,
+      "d": 0.5,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "low-detail-building-i",
+      "w": 0.5,
+      "h": 1.775,
+      "d": 0.5,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "low-detail-building-j",
+      "w": 0.5,
+      "h": 1.75,
+      "d": 0.5,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "low-detail-building-k",
+      "w": 0.5,
+      "h": 1.55,
+      "d": 0.5,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "low-detail-building-l",
+      "w": 0.5,
+      "h": 1.85,
+      "d": 0.5,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "low-detail-building-m",
+      "w": 0.5,
+      "h": 1.975,
+      "d": 0.5,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "low-detail-building-n",
+      "w": 0.5,
+      "h": 0.7,
+      "d": 0.5,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "low-detail-building-wide-a",
+      "w": 1,
+      "h": 1.1,
+      "d": 0.5,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    },
+    {
+      "name": "low-detail-building-wide-b",
+      "w": 1,
+      "h": 1.15,
+      "d": 0.5,
+      "ox": 0,
+      "oy": 0,
+      "oz": 0
+    }
   ]
 }

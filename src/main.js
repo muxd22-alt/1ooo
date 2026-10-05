@@ -22,6 +22,7 @@ import { intentFromLogits, directorState } from './ai/director.js';
 import { createCarFleet } from './game/carFleet.js';
 import { createViewmodel } from './game/viewmodel.js';
 import { createGrassField } from './world/grassScatter.js';
+import { createCityBuild } from './world/cityBuild.js';
 import { createSignals } from './game/signals.js';
 import { createSkyFX } from './world/skyFX.js';
 import { createTracers } from './game/tracers.js';
@@ -131,6 +132,9 @@ let signals = null;
 let skyFX = null;
 let tracers = null;
 let neonGlow = null;
+let city = null;
+let cityBuildToken = 0;
+let cityErr = null;
 let voxelsMirror = null;
 let weapon = loadPreset(1, seed);
 let lastShotAt = -Infinity;
@@ -232,8 +236,6 @@ function applyTheme(next) {
 
 applyTheme(theme);
 
-worker.onerror = (e) => console.error('worker error:', (e && e.message) || String(e));
-
 worker.onmessage = (event) => {
   const msg = event.data;
 
@@ -296,6 +298,24 @@ worker.onmessage = (event) => {
       neonGlow = null;
     }
     neonGlow = createNeonGlow(scene, msg.neonSpots, theme.vibe);
+    if (city) {
+      city.dispose();
+      city = null;
+    }
+    const token = ++cityBuildToken;
+    createCityBuild(scene, msg.seed, theme.vibe)
+      .then((c) => {
+        if (token !== cityBuildToken) {
+          c.dispose();
+          return;
+        }
+        city = c;
+        cityErr = null;
+      })
+      .catch((err) => {
+        cityErr = String((err && err.message) || err);
+        console.error('city build failed:', cityErr);
+      });
   }
 
   for (const chunk of msg.chunks) upsertChunkMesh(chunk);
@@ -605,6 +625,51 @@ window.__engine = {
     sky: () => (skyFX ? { clouds: skyFX.cloudCount, shafts: skyFX.shaftCount } : null),
     tracers: () => (tracers ? { count: tracers.count, ...tracers.debug() } : null),
     glow: () => (neonGlow ? neonGlow.count : 0),
+    city: () => (city ? { count: city.count, signs: city.signs, models: city.models, dbg: city.dbg } : cityErr ? { error: cityErr } : null),
+  probeRay: (o, d, maxDist = 90) => {
+    if (!voxelsMirror || chunkMeshes.size === 0) return null;
+    const dir = new THREE.Vector3(d[0], d[1], d[2]).normalize();
+    const ray = new THREE.Raycaster(new THREE.Vector3(o[0], o[1], o[2]), dir, 0, maxDist);
+    const hits = ray.intersectObjects([...chunkMeshes.values()], false);
+    if (!hits.length) return null;
+    const h = hits[0];
+    const n = h.face ? h.face.normal : { x: 0, y: 0, z: 0 };
+    const c = PLANET.center;
+    const r = Math.hypot(h.point.x - c, h.point.y - c, h.point.z - c);
+    const bx = Math.floor(h.point.x - n.x * 0.55);
+    const by = Math.floor(h.point.y - n.y * 0.55);
+    const bz = Math.floor(h.point.z - n.z * 0.55);
+    const inside = bx >= 0 && by >= 0 && bz >= 0 && bx < PLANET.size && by < PLANET.size && bz < PLANET.size;
+    return { dist: +h.distance.toFixed(3), r: +r.toFixed(3), id: inside ? voxelsMirror[planetIndex(bx, by, bz)] : -1 };
+  },
+  probeGround: (latDeg, lonDeg) => {
+    const lat = (latDeg * Math.PI) / 180;
+    const lon = (lonDeg * Math.PI) / 180;
+    const ux = Math.cos(lat) * Math.cos(lon);
+    const uy = Math.sin(lat);
+    const uz = Math.cos(lat) * Math.sin(lon);
+    const c = PLANET.center;
+    const rr = PLANET.radius + 40;
+    return window.__engine.probeRay([c + ux * rr, c + uy * rr, c + uz * rr], [-ux, -uy, -uz], 90);
+  },
+  probeVoxel: (latDeg, lonDeg) => {
+    if (!voxelsMirror) return null;
+    const lat = (latDeg * Math.PI) / 180;
+    const lon = (lonDeg * Math.PI) / 180;
+    const ux = Math.cos(lat) * Math.cos(lon);
+    const uy = Math.sin(lat);
+    const uz = Math.cos(lat) * Math.sin(lon);
+    const c = PLANET.center;
+    for (let r = PLANET.radius + 6; r > PLANET.radius - 6; r -= 0.25) {
+      const x = Math.floor(c + ux * r);
+      const y = Math.floor(c + uy * r);
+      const z = Math.floor(c + uz * r);
+      if (x < 0 || y < 0 || z < 0 || x >= PLANET.size || y >= PLANET.size || z >= PLANET.size) continue;
+      const id = voxelsMirror[planetIndex(x, y, z)];
+      if (id !== 0) return { r: +r.toFixed(2), id };
+    }
+    return null;
+  },
   sceneStats: () => {
     let nodes = 0;
     let instanced = 0;

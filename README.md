@@ -25,7 +25,8 @@ Live build: https://muxd22-alt.github.io/1ooo/
 * **Laya ONNX Edge AI (Web Worker):** Executes a quantized INT8 neural network (`onnxruntime-web` over WASM) off-thread to analyze 10 Hz player telemetry vectors (aim sigma, APM, movement variance) into tactical logits — AGGRESSIVE / HARVESTER / CAMPER — driving atmosphere and director state.
 * **Deterministic Seeding:** Planet generation and its color theme are seeded (`?seed=1337` or `R` to reseed) and reproducible across client and CI (reference-tested mesher output). Without a `?seed=` parameter the game draws a crypto-random seed and opens a neon boot menu (reroll, weapon pick, deploy); with `?seed=` it boots straight into the world.
 * **First-Person Viewmodel:** GLB gun models (AR / SMG / DMR) with recoil sway, kick animation, sparkle eject and a star-shaped muzzle flash with a brief muzzle light — all themed per-seed by the vibe palette.
-* **Rounded Terrain & Raised Sidewalks:** Voxel columns are radially smoothed with a 512³ direction key, quantized radial scale memo and a smoothstep sidewalk rise (~0.33 m above the road with a 0.7 m fade), so streets read as sidewalks + curbs instead of boxes at eye level.
+* **Rounded Terrain & Raised Sidewalks:** Voxel columns are radially smoothed with a 512³ direction key, quantized radial scale memo, 5.5 m smoothing taps and a smoothstep sidewalk rise (~0.33 m above the road with a 0.7 m fade) — earth, roads and curbs read as continuous surfaces instead of voxel stairs. Building plots are masked out of the smoothing taps so structures never carve ditches into the ground.
+* **GLB Building Models:** 35 CC0 commercial city-kit models (`skyscraper`, `building`, `low-detail-building` families) are loaded once, cached, and placed as `InstancedMesh` batches — position, yaw and uniform scale computed from per-plot math on the sphere (east/up/north basis at plot center, bbox-fit scale, ground-origin translate). Neon sign quads are emitted onto the actual oriented wall extents of each placed model.
 * **Scattered Grass:** Seeded grass tufts (`grassScatter.js`) instanced along walkable ground, tinted from the theme nature palette.
 * **Seeded Traffic Signals:** 48 signal poles at the 24 intersections, each intersection phase derived from the seed hash with a 7.6 s green/amber/red cycle per axis.
 * **Blocky Clouds & Light Shafts:** A drifting field of flat-white blocky cloud clusters acts as the visible light source for 9 sun shafts and 9 ground light pools anchored to the surface.
@@ -116,8 +117,11 @@ npm run diag
 # Validate production build
 npm run build
 
-# Capture the visual regression screenshot suite (14 day shots; MENU=1 for the boot menu, NIGHT=1 for the night trio, ONLY=<name> for one shot)
+# Capture the visual regression screenshot suite (14 day shots; MENU=1 for the boot menu, NIGHT=1 for the night trio, ONLY=<name> for one shot, SEED=<n> for a specific seed)
 node scripts/shot.mjs
+
+# Numeric scene probes over CDP (road/sidewalk radii + block ids, camera rays, city instance/sign placement dbg)
+node scripts/probe.mjs
 
 # Regenerate the Laya ONNX model + reference logits (needs Python + onnx/onnxruntime)
 npm run gen:model
@@ -179,7 +183,8 @@ Aggregation rules: damage = flat sum x scalar product; RPM/weight/recoil/radius 
 - [x] **Phase 2: Gunsmith & Edge AI** — 4-slot weapon aggregation, Laya ONNX worker pipeline, HUD telemetry.
 - [x] **Phase 3: CI & Deployment** — GitHub Actions (test + smoke + build) and GitHub Pages auto-deploy.
 - [x] **Phase 4: Planet World** — radial-gravity spherical city (meridian roads, 12 districts, no seams), per-seed color themes, AO/smooth shading, day/night cycle with emissive street lights.
-- [ ] **Phase 5: Physics & Colliders** — Rapier3D trimesh/compound-cuboid colliders derived from worker mesher output (rebuilt per re-mesh, not per shot).
+- [x] **Phase 5: Smooth Earth & GLB City** — 5.5 m tap displacement smoothing with structural masking (staircase-free earth, roads and sidewalks), CC0 GLB building models instanced by spherical placement math with wall-mounted neon signs.
+- [ ] **Phase 6: Physics & Colliders** — Rapier3D trimesh/compound-cuboid colliders derived from worker mesher output (rebuilt per re-mesh, not per shot).
 
 ---
 

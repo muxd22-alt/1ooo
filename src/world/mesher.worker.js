@@ -11,7 +11,7 @@ const HALO = SUB + 2;
 const CORE = [1, 1, 1, SUB + 1, SUB + 1, SUB + 1];
 const HI_R = PLANET.radius + PLANET.maxStruct + 1;
 
-const store = { voxels: null, seed: null, spawn: null, theme: null };
+const store = { voxels: null, structs: null, seed: null, spawn: null, theme: null };
 
 function extractSub(i, j, k) {
   const sub = new Uint8Array(HALO * HALO * HALO);
@@ -75,7 +75,10 @@ function meshSub(i, j, k) {
     core: CORE,
     cellSplit: true,
     offset: [i * SUB - 1, j * SUB - 1, k * SUB - 1],
-    displace
+    displace,
+    structs: store.structs,
+    structOrigin: [i * SUB - 1, j * SUB - 1, k * SUB - 1],
+    structSize: S
   });
   return {
     i,
@@ -165,7 +168,8 @@ self.onmessage = (event) => {
   if (msg.type === 'build') {
     const t0 = performance.now();
     store.seed = msg.seed;
-    store.voxels = generatePlanet(store.seed);
+    store.structs = new Uint8Array(S * S * S);
+    store.voxels = generatePlanet(store.seed, store.structs);
     store.theme = makeTheme(store.seed);
     store.spawn = planetSpawn();
     const t1 = performance.now();
@@ -259,6 +263,7 @@ self.onmessage = (event) => {
       if (store.voxels[idx] !== 0) return fail('cell occupied');
       if (!(Number.isInteger(material) && material > 0 && material <= 255)) return fail('bad material');
       store.voxels[idx] = material;
+      if (store.structs) store.structs[idx] = 0;
     }
 
     const x = idx % S;
