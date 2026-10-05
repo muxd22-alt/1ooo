@@ -6,7 +6,7 @@ const DEG = Math.PI / 180;
 const TAU = Math.PI * 2;
 
 export const TRAFFIC = Object.freeze({
-  roadR: R + 1.05,
+  roadR: R + 0.9,
   lane: 2.5,
   parkOffset: ROAD_HALF - 1,
   lmax: CITY_MAX_LAT * DEG

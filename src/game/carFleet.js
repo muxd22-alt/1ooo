@@ -23,6 +23,9 @@ export async function createCarFleet(scene, seed) {
   for (const [name, list] of byModel) {
     const gltf = await loader.loadAsync(`models/cars/${name}.glb`);
     const root = gltf.scene;
+    const bounds = new THREE.Box3().setFromObject(root);
+    const fixY = -0.3 - bounds.min.y;
+    const shift = new THREE.Matrix4().makeTranslation(0, fixY, 0);
     root.updateMatrixWorld(true);
     const locals = [];
     const insts = [];
@@ -32,7 +35,7 @@ export async function createCarFleet(scene, seed) {
       im.frustumCulled = false;
       im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       scene.add(im);
-      locals.push(o.matrixWorld.clone());
+      locals.push(shift.clone().multiply(o.matrixWorld));
       insts.push(im);
     });
     list.forEach((v, i) => {

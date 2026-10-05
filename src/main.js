@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import './style.css';
 import { PLANET, SUB_SIZE, planetIndex } from './world/planet.js';
 import { makeTheme } from './world/theme.js';
-import { BLOCK_NAMES } from './world/blocks.js';
+import { BLOCK_NAMES, BLOCK } from './world/blocks.js';
 import { raycastVoxels } from './world/voxelOps.js';
 import { createChunkMaterial } from './render/chunkMaterial.js';
 import { PlanetControls, BODY_HEIGHTS } from './player/planetControls.js';
@@ -219,6 +219,7 @@ const MOON_COLOR = new THREE.Color(0x9fb6e8);
 
 function applyTheme(next) {
   theme = next;
+  chunkMaterial.setPaint(theme.palette[BLOCK.ROAD], theme.palette[BLOCK.ROAD_LINE]);
   SKY_DAY.setHex(theme.sky);
   SKY_NIGHT.setHex(theme.skyNight);
   SKY_DUSK.setHex(theme.dusk);

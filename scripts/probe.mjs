@@ -189,6 +189,12 @@ try {
     console.log(`lat=${lat.toFixed(1).padStart(5)} ${fmt(JSON.parse(h))}`);
   }
 
+  console.log('--- fine curb profile lon=10, lat 4.0..10.0 step 0.1 ---');
+  for (let lat = 4; lat <= 10.0001; lat += 0.1) {
+    const h = await evalJson(cdp, `JSON.stringify(window.__engine.probeGround(${lat.toFixed(2)}, 10))`);
+    console.log(`lat=${lat.toFixed(1).padStart(5)} ${fmt(JSON.parse(h))}`);
+  }
+
   console.log('--- cross lat=10 (street-e/w road), lon 36..54 ---');
   for (let lon = 36; lon <= 54.0001; lon += 0.5) {
     const h = await evalJson(cdp, `JSON.stringify(window.__engine.probeGround(10, ${lon.toFixed(2)}))`);
@@ -205,6 +211,21 @@ try {
       'JSON.stringify((() => { const p = window.__engine.pos(); const f = window.__engine.camFwd(); return window.__engine.probeRay(p, f, 60); })())'
     );
     console.log(`${v.name.padEnd(9)} ${fmt(JSON.parse(hit))}`);
+  }
+
+  console.log('--- street-n pitch scan ---');
+  {
+    const v = VIEWS[0];
+    const feet = surface(v.lat, v.lon, Math.max(0.1, (v.eye ?? 1.7) - 1.6));
+    for (const p of [-0.12, -0.25, -0.4, -0.55, -0.7]) {
+      await evalJson(cdp, `window.__engine.view(${JSON.stringify(feet)}, ${v.yaw}, ${p}), 'ok'`);
+      await sleep(120);
+      const hit = await evalJson(
+        cdp,
+        'JSON.stringify((() => { const p = window.__engine.pos(); const f = window.__engine.camFwd(); return window.__engine.probeRay(p, f, 60); })())'
+      );
+      console.log(`pitch=${p.toFixed(2)} ${fmt(JSON.parse(hit))}`);
+    }
   }
 
   console.log('--- voxel id sweep around cameras (0,2,4,6,8,10m) ---');

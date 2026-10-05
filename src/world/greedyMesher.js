@@ -1,4 +1,5 @@
 import { BLOCK_EMISSIVE, BLOCK_PALETTE, isStructureId } from './blocks.js';
+import { PLANET } from './planet.js';
 
 const PALETTE_FALLBACK = [1, 0, 1];
 const NO_EMISSIVE = [0, 0, 0];
@@ -25,6 +26,7 @@ export function greedyMesh(voxels, sx, sy, sz, opts = {}) {
   const indices = [];
 
   let vertCount = 0;
+  const keep = [];
   let faceCount = 0;
 
   const at = (x, y, z) => {
@@ -192,7 +194,23 @@ export function greedyMesh(voxels, sx, sy, sz, opts = {}) {
         nz = cz2 / len;
       }
     }
-    for (let k = 0; k < 4; k++) normals.push(nx, ny, nz);
+    if (displace && d === 1) {
+      for (let k = 0; k < 4; k++) {
+        const s2 = vertCount * 12 + k * 3;
+        let rx = positions[s2] + offset[0] - PLANET.center;
+        let ry = positions[s2 + 1] + offset[1] - PLANET.center;
+        let rz = positions[s2 + 2] + offset[2] - PLANET.center;
+        const rl = Math.hypot(rx, ry, rz) || 1;
+        rx = (rx / rl) * dir;
+        ry = (ry / rl) * dir;
+        rz = (rz / rl) * dir;
+        normals.push(rx, ry, rz);
+      }
+      keep.push(1, 1, 1, 1);
+    } else {
+      for (let k = 0; k < 4; k++) normals.push(nx, ny, nz);
+      keep.push(0, 0, 0, 0);
+    }
 
     if (useAO) {
       const airLayer = dir > 0 ? plane : plane - 1;
@@ -238,6 +256,7 @@ export function greedyMesh(voxels, sx, sy, sz, opts = {}) {
       (positions[vi * 3] * 8192 + positions[vi * 3 + 1]) * 8192 + positions[vi * 3 + 2];
     const original = normals.slice();
     for (let vi = 0; vi < vertCount; vi++) {
+      if (keep[vi]) continue;
       const key = keyAt(vi);
       let s = sums.get(key);
       if (!s) {
@@ -249,6 +268,7 @@ export function greedyMesh(voxels, sx, sy, sz, opts = {}) {
       s[2] += normals[vi * 3 + 2];
     }
     for (let vi = 0; vi < vertCount; vi++) {
+      if (keep[vi]) continue;
       const s = sums.get(keyAt(vi));
       const len = Math.hypot(s[0], s[1], s[2]);
       if (len < 1e-6) {

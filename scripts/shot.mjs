@@ -34,7 +34,7 @@ const SHOTS = [
 ].filter((s) => {
   if (process.env.MENU) return s.name === 'menu';
   if (process.env.NIGHT) return ['signals', 'rooftops', 'avenue'].includes(s.name);
-  return s.name !== 'menu' && (!process.env.ONLY || s.name === process.env.ONLY);
+  return s.name !== 'menu' && (!process.env.ONLY || process.env.ONLY.split(',').includes(s.name));
 });
 
 function killTree(pid) {

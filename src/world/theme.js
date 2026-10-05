@@ -80,17 +80,17 @@ const NOUNS = Object.freeze([
 export function makeTheme(seed) {
   const rand = mulberry32((seed ^ 0x9e3779b9) >>> 0);
   const h1 = rand() * 360;
-  const h2 = (h1 + 140 + rand() * 80) % 360;
+  const h2 = (h1 + 100 + rand() * 160) % 360;
   const h3 = rand() * 360;
   const hSky = rand() * 360;
   const satNature = 0.4 + rand() * 0.4;
-  const satMuted = 0.08 + rand() * 0.22;
-  const litNature = 0.3 + rand() * 0.2;
+  const satMuted = 0.06 + rand() * 0.34;
+  const litNature = 0.28 + rand() * 0.26;
 
   const vibeRand = mulberry32((seed ^ 0x51ed270b) >>> 0);
   const vHue = vibeRand() * 360;
-  const vHue2 = (vHue + 140 + vibeRand() * 80) % 360;
-  const vHue3 = (vHue2 + 140 + vibeRand() * 80) % 360;
+  const vHue2 = (vHue + 100 + vibeRand() * 160) % 360;
+  const vHue3 = (vHue2 + 100 + vibeRand() * 160) % 360;
   const grassHue = 96 + vibeRand() * 44;
 
   const grass = hslToRgb(grassHue, 0.72 + vibeRand() * 0.2, litNature + 0.12);
@@ -110,8 +110,8 @@ export function makeTheme(seed) {
     [BLOCK.STONE]: hslToRgb(h1, satMuted * 0.6, 0.5),
     [BLOCK.SAND]: hslToRgb(h1 + 35, satMuted + 0.25, 0.75),
     [BLOCK.ROAD]: hslToRgb(h1, satMuted * 0.5, 0.13 + rand() * 0.04),
-    [BLOCK.ROAD_LINE]: hslToRgb(h2, 0.8, 0.62),
-    [BLOCK.SIDEWALK]: hslToRgb(h1, satMuted, 0.62),
+    [BLOCK.ROAD_LINE]: hslToRgb(h2, 0.9, 0.72),
+    [BLOCK.SIDEWALK]: hslToRgb(h1 + 10, Math.min(0.5, satMuted + 0.25), 0.66 + rand() * 0.06),
     [BLOCK.BRICK]: hslToRgb(h2, 0.4 + rand() * 0.2, 0.45),
     [BLOCK.CONCRETE]: hslToRgb(h2, satMuted, 0.7),
     [BLOCK.GLASS]: hslToRgb(h2, 0.45, 0.55),
@@ -160,7 +160,7 @@ export function makeTheme(seed) {
       leaves: toHex(leaves),
       flash: toHex(hslToRgb(vHue3, 1.0, 0.66))
     },
-    sky: toHex(hslToRgb(hSky, 0.3 + rand() * 0.3, 0.58 + rand() * 0.14)),
+    sky: toHex(hslToRgb(hSky, 0.25 + rand() * 0.4, 0.58 + rand() * 0.14)),
     skyNight: toHex(hslToRgb(hSky, 0.45, 0.05 + rand() * 0.05)),
     dusk: toHex(hslToRgb(hSky + 30, 0.7, 0.55)),
     sun: toHex(hslToRgb(hSky - 20 + rand() * 40, 0.2 + rand() * 0.3, 0.75)),

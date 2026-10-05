@@ -80,7 +80,7 @@ export function createSignals(scene, seed) {
   const tmp = new THREE.Vector3();
 
   lights.forEach((light, i) => {
-    const base = worldPos(light.lat, light.lon, R + 1.12);
+    const base = worldPos(light.lat, light.lon, R + 0.55);
     const radial = tmp.copy(base).sub(new THREE.Vector3(C, C, C)).normalize().clone();
     const q = alignY(radial);
     light.phase = light.offset * CYCLE_MS;
@@ -149,7 +149,7 @@ export function createSignals(scene, seed) {
       lat: +light.lat.toFixed(4),
       lon: +light.lon.toFixed(4),
       axis: light.axis,
-      pos: worldPos(light.lat, light.lon, R + 1.12)
+      pos: worldPos(light.lat, light.lon, R + 0.55)
         .toArray()
         .map((v) => +v.toFixed(1))
     }));
