@@ -109,7 +109,7 @@ export function makeTheme(seed) {
     [BLOCK.DIRT]: hslToRgb(h1 + 16, satNature * 0.75, litNature - 0.08),
     [BLOCK.STONE]: hslToRgb(h1, satMuted * 0.6, 0.5),
     [BLOCK.SAND]: hslToRgb(h1 + 35, satMuted + 0.25, 0.75),
-    [BLOCK.ROAD]: hslToRgb(h1, satMuted * 0.5, 0.13 + rand() * 0.04),
+    [BLOCK.ROAD]: hslToRgb(h1, satMuted * 0.5, 0.25 + rand() * 0.08),
     [BLOCK.ROAD_LINE]: hslToRgb(h2, 0.9, 0.72),
     [BLOCK.SIDEWALK]: hslToRgb(h1 + 10, Math.min(0.5, satMuted + 0.25), 0.66 + rand() * 0.06),
     [BLOCK.BRICK]: hslToRgb(h2, 0.4 + rand() * 0.2, 0.45),

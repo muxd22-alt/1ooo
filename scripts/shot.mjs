@@ -26,6 +26,7 @@ const SHOTS = [
   { name: 'car-top', feet: [144.21, 118.76, 54.39], yaw: 0.4, pitch: -1.2 },
   { name: 'overview', lat: 8, lon: 8, yaw: 0.6, pitch: -0.85, eye: 30 },
   { name: 'skyline', lat: 6, lon: 6, yaw: 0.9, pitch: -0.3, eye: 52 },
+  { name: 'orbit', feet: [305, 125.8, 125.6], yaw: 0.6, pitch: -1.57 },
   { name: 'flash', lat: 0.4, lon: 10, yaw: 0, pitch: -0.15, eye: 1.7, fire: true },
   { name: 'tracer', lat: 0.4, lon: 10, yaw: 0, pitch: 0.28, eye: 1.7, fire: true, tracer: true },
   { name: 'signals', lat: -2.6, lon: 6.355, yaw: 0, pitch: -0.08, eye: 1.7 },

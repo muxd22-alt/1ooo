@@ -118,6 +118,8 @@ sun.position.set(80, 120, 40);
 scene.add(sun);
 const hemiLight = new THREE.HemisphereLight(0xcfe2ff, 0x6a5a44, 1.4);
 scene.add(hemiLight);
+const ambientLight = new THREE.AmbientLight(0xbdd0e8, 0.55);
+scene.add(ambientLight);
 
 const chunkMaterial = createChunkMaterial();
 
@@ -227,6 +229,7 @@ function applyTheme(next) {
   MOON_COLOR.setHex(theme.moon);
   hemiLight.color.setHex(theme.hemiSky);
   hemiLight.groundColor.setHex(theme.hemiGround);
+  ambientLight.color.setHex(theme.hemiSky);
   if (viewmodel) viewmodel.setVibe(theme.vibe);
   if (tracers) {
     tracers.dispose();
@@ -877,6 +880,7 @@ function applyAtmosphere(dt, now) {
   sun.position.lerp(dn.sunPos, t);
   const dramaDim = 1 - 0.22 * atmo.drama * (0.4 + 0.6 * dn.night);
   hemiLight.intensity += (dn.hemi * (target.hemi / 1.4) * dramaDim - hemiLight.intensity) * t;
+  ambientLight.intensity += (0.1 + 0.45 * (1 - dn.night) - ambientLight.intensity) * t;
   const glowTarget = (0.15 + 0.85 * dn.night) * (0.72 + 0.55 * atmo.neon);
   chunkMaterial.nightGlow.value += (glowTarget - chunkMaterial.nightGlow.value) * t;
 

@@ -137,7 +137,7 @@ export function greedyMesh(voxels, sx, sy, sz, opts = {}) {
     }
   }
 
-  function emitCells(d, u, v, plane, a, b, w, h, mat, em, dir) {
+  function emitCells(d, u, v, plane, a, b, w, h, mat, em, dir, matId) {
     const base = [0, 0, 0];
     base[d] = plane;
     base[u] = a;
@@ -194,7 +194,7 @@ export function greedyMesh(voxels, sx, sy, sz, opts = {}) {
         nz = cz2 / len;
       }
     }
-    if (displace && d === 1) {
+    if (displace && d === 1 && !isStructureId(matId)) {
       for (let k = 0; k < 4; k++) {
         const s2 = vertCount * 12 + k * 3;
         let rx = positions[s2] + offset[0] - PLANET.center;
@@ -242,12 +242,12 @@ export function greedyMesh(voxels, sx, sy, sz, opts = {}) {
     if (cellSplit && matId < 32 && (w > 1 || h > 1)) {
       for (let j = 0; j < h; j++) {
         for (let i = 0; i < w; i++) {
-          emitCells(d, u, v, plane, a + i, b + j, 1, 1, mat, em, dir);
+          emitCells(d, u, v, plane, a + i, b + j, 1, 1, mat, em, dir, matId);
         }
       }
       return;
     }
-    emitCells(d, u, v, plane, a, b, w, h, mat, em, dir);
+    emitCells(d, u, v, plane, a, b, w, h, mat, em, dir, matId);
   }
 
   if (useSmooth && vertCount > 0) {
