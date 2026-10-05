@@ -11,7 +11,9 @@ const ASSETS = [
   { name: 'car-kit', page: 'https://opengameart.org/content/car-kit' },
   { name: 'city-kit-commercial', page: 'https://opengameart.org/content/city-kit-commercial' },
   { name: 'nature-kit', page: 'https://opengameart.org/content/nature-kit' },
-  { name: 'city-kit-roads', page: 'https://opengameart.org/content/city-kit-roads' }
+  { name: 'city-kit-roads', page: 'https://opengameart.org/content/city-kit-roads' },
+  { name: 'blaster-kit', url: 'https://kenney.nl/media/pages/assets/blaster-kit/261d80a716-1753959510/kenney_blaster-kit_2.1.zip' },
+  { name: 'particle-pack', url: 'https://kenney.nl/media/pages/assets/particle-pack/f8fe0f8cb8-1677578741/kenney_particle-pack.zip' }
 ];
 
 async function get(url, asBuffer = false) {

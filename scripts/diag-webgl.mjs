@@ -73,7 +73,7 @@ try {
     });
     await waitForHttp(`http://localhost:${APP_PORT}/`, 30000);
   }
-  const url = TARGET_URL ?? `http://localhost:${APP_PORT}/`;
+  const url = TARGET_URL ?? `http://localhost:${APP_PORT}/?seed=1337`;
 
   chrome = spawn(
     CHROME,

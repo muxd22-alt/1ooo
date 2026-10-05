@@ -3,10 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>1ooo — Voxel Engine (Phase 1)</title>
+    <title>1ooo — Neon Voxel World</title>
   </head>
   <body>
     <canvas id="view"></canvas>
+    <div id="menu" class="hidden">
+      <div class="menu-box">
+        <div class="menu-title">1OOO</div>
+        <div class="menu-sub">NEON VOXEL WORLD</div>
+        <div class="menu-row">
+          <span class="menu-seed-label">SEED <b id="menu-seed">#00000000</b></span>
+          <button id="menu-reroll" class="chip" type="button">REROLL</button>
+        </div>
+        <div class="loadout" id="menu-loadout">
+          <button class="card" data-preset="1" type="button"><b>AR</b><span class="dn">—</span></button>
+          <button class="card" data-preset="2" type="button"><b>SMG</b><span class="dn">—</span></button>
+          <button class="card" data-preset="3" type="button"><b>DMR</b><span class="dn">—</span></button>
+        </div>
+        <div id="menu-pool" class="pool">seed pool idle · 8 slots</div>
+        <button id="menu-play" type="button">DEPLOY</button>
+      </div>
+    </div>
     <div id="hud">
       <pre id="hud-stats">booting…</pre>
       <div id="hud-help">

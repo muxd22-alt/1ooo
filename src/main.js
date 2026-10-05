@@ -20,14 +20,30 @@ import {
 } from './ai/telemetry.js';
 import { intentFromLogits, directorState } from './ai/director.js';
 import { createCarFleet } from './game/carFleet.js';
+import { createViewmodel } from './game/viewmodel.js';
+import { createGrassField } from './world/grassScatter.js';
 
 const canvas = document.getElementById('view');
 const hudStats = document.getElementById('hud-stats');
 hudStats.textContent = 'initializing renderer…';
 
 const params = new URLSearchParams(location.search);
-let seed = Number.parseInt(params.get('seed') ?? '1337', 10);
-if (!Number.isFinite(seed)) seed = 1337;
+const seedParam = params.get('seed');
+let menuOpen = false;
+let seed = 1337;
+if (seedParam !== null && seedParam !== '') {
+  const parsed = Number.parseInt(seedParam, 10);
+  if (Number.isFinite(parsed)) seed = parsed >>> 0;
+} else {
+  seed = randomSeed();
+  menuOpen = true;
+}
+
+function randomSeed() {
+  const a = new Uint32Array(1);
+  globalThis.crypto.getRandomValues(a);
+  return a[0] >>> 0;
+}
 
 const DAY_LENGTH_MS = 180000;
 const phaseOffset = Number.parseFloat(params.get('phase') ?? '0') || 0;
@@ -89,6 +105,7 @@ scene.fog = new THREE.FogExp2(skyColor, 0.0045);
 
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 900);
 camera.rotation.order = 'YXZ';
+scene.add(camera);
 
 const sun = new THREE.DirectionalLight(0xfff2df, 3.0);
 sun.position.set(80, 120, 40);
@@ -103,6 +120,8 @@ const chunkStats = new Map();
 let opId = 0;
 let lastBuild = null;
 let theme = makeTheme(seed);
+let viewmodel = null;
+let grassField = null;
 let voxelsMirror = null;
 let weapon = loadPreset(1, seed);
 let lastShotAt = -Infinity;
@@ -193,6 +212,7 @@ function applyTheme(next) {
   MOON_COLOR.setHex(theme.moon);
   hemiLight.color.setHex(theme.hemiSky);
   hemiLight.groundColor.setHex(theme.hemiGround);
+  if (viewmodel) viewmodel.setVibe(theme.vibe);
 }
 
 applyTheme(theme);
@@ -237,6 +257,11 @@ worker.onmessage = (event) => {
     voxelsMirror = msg.voxels;
     applyTheme(makeTheme(msg.seed));
     controls.respawn(msg.spawn);
+    if (grassField) {
+      grassField.dispose();
+      grassField = null;
+    }
+    grassField = createGrassField(scene, voxelsMirror, theme.vibe.grass, msg.seed);
   }
 
   for (const chunk of msg.chunks) upsertChunkMesh(chunk);
@@ -471,6 +496,7 @@ function shoot(now) {
   lastShotAt = now;
   shots++;
   noteShot(telemetry, now);
+  if (viewmodel) viewmodel.fire();
 
   const origin = camera.position;
   const dir = camera.getWorldDirection(new THREE.Vector3());
@@ -532,6 +558,12 @@ window.__engine = {
     carFleet
       ? { count: carFleet.count, moving: carFleet.moving, parked: carFleet.parked, diagnostics: carFleet.diagnostics() }
       : { count: 0, moving: 0, parked: 0, diagnostics: [] },
+  viewmodel: () =>
+    viewmodel
+      ? { loaded: viewmodel.count, slot: viewmodel.slot, debug: viewmodel.debug ? viewmodel.debug() : null }
+      : { loaded: 0, slot: 0, debug: null },
+  vmPoke: (state) => (viewmodel && viewmodel.poke ? viewmodel.poke(state) : false),
+  grass: () => (grassField ? grassField.count : 0),
   sceneStats: () => {
     let nodes = 0;
     let instanced = 0;
@@ -578,7 +610,81 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+let menuPreset = 1;
+let deploying = false;
+const menuEl = document.getElementById('menu');
+
+function renderMenu() {
+  if (!menuEl) return;
+  const seedEl = document.getElementById('menu-seed');
+  if (seedEl) seedEl.textContent = `#${seed.toString(16).toUpperCase().padStart(8, '0')}`;
+  for (const card of menuEl.querySelectorAll('.card')) {
+    const idx = Number(card.dataset.preset);
+    card.classList.toggle('selected', idx === menuPreset);
+    const dn = card.querySelector('.dn');
+    if (dn) dn.textContent = loadPreset(idx, seed).displayName;
+  }
+}
+
+function reroll() {
+  if (!menuOpen) return;
+  seed = randomSeed();
+  weapon = loadPreset(menuPreset, seed);
+  if (viewmodel) viewmodel.setWeapon(menuPreset);
+  lastShotAt = -Infinity;
+  requestBuild(seed);
+  renderMenu();
+}
+
+async function deploy() {
+  if (!menuOpen || deploying) return;
+  deploying = true;
+  weapon = loadPreset(menuPreset, seed);
+  if (viewmodel) viewmodel.setWeapon(menuPreset);
+  lastShotAt = -Infinity;
+  const pool = document.getElementById('menu-pool');
+  const play = document.getElementById('menu-play');
+  if (play) play.disabled = true;
+  menuEl.classList.add('linking');
+  for (let n = 1; n <= 3; n++) {
+    if (pool) pool.textContent = `linking seed pool · ${n + 2}/8 peers`;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  if (pool) pool.textContent = 'seed pool linked · 8/8';
+  menuOpen = false;
+  menuEl.classList.add('gone');
+  setTimeout(() => menuEl.classList.add('hidden'), 420);
+}
+
+function setupMenu() {
+  if (!menuEl) return;
+  if (!menuOpen) {
+    menuEl.classList.add('hidden');
+    return;
+  }
+  menuEl.classList.remove('hidden');
+  renderMenu();
+  for (const card of menuEl.querySelectorAll('.card')) {
+    card.addEventListener('click', () => {
+      menuPreset = Number(card.dataset.preset);
+      renderMenu();
+    });
+  }
+  document.getElementById('menu-play')?.addEventListener('click', deploy);
+  document.getElementById('menu-reroll')?.addEventListener('click', reroll);
+}
+
 window.addEventListener('keydown', (event) => {
+  if (menuOpen) {
+    const idx = Number(event.key);
+    if (idx >= 1 && idx <= 3) {
+      menuPreset = idx;
+      renderMenu();
+    } else if (event.code === 'KeyR') {
+      reroll();
+    }
+    return;
+  }
   if (event.code === 'KeyR') {
     shots = 0;
     hits = 0;
@@ -587,6 +693,7 @@ window.addEventListener('keydown', (event) => {
     noteAction(telemetry);
     requestBuild((Math.random() * 0xffffffff) >>> 0);
     weapon = loadPreset(weapon.index, seed);
+    if (viewmodel) viewmodel.setWeapon(weapon.index);
     lastShotAt = -Infinity;
     return;
   }
@@ -597,6 +704,7 @@ window.addEventListener('keydown', (event) => {
   const presetIndex = Number(event.key);
   if (presetIndex >= 1 && presetIndex <= 3) {
     weapon = loadPreset(presetIndex, seed);
+    if (viewmodel) viewmodel.setWeapon(presetIndex);
     lastShotAt = -Infinity;
     noteAction(telemetry);
   }
@@ -674,6 +782,7 @@ renderer.setAnimationLoop((now) => {
 
   controls.update(dt);
   if (carFleet) carFleet.update(dt);
+  if (viewmodel) viewmodel.update(dt);
   pollTools(now);
   const dn = applyAtmosphere(dt, now);
   renderer.render(scene, camera);
@@ -706,6 +815,8 @@ renderer.setAnimationLoop((now) => {
   }
 });
 
+setupMenu();
+
 requestBuild(seed);
 
 let carFleet = null;
@@ -714,3 +825,9 @@ createCarFleet(scene, seed)
     carFleet = fleet;
   })
   .catch(() => {});
+
+createViewmodel(camera, theme.vibe)
+  .then((vm) => {
+    viewmodel = vm;
+  })
+  .catch((err) => console.warn('viewmodel:', err.message));

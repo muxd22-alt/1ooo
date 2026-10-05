@@ -1,7 +1,9 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateSync } from 'node:zlib';
+import { NodeIO } from '@gltf-transform/core';
+import { dedup, prune } from '@gltf-transform/functions';
 import { BLOCK, BLOCK_PALETTE } from '../src/world/blocks.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -517,6 +519,39 @@ for (const car of CARS) {
   copyFileSync(join(CAR_SRC, `${car}.glb`), join(carsOut, `${car}.glb`));
 }
 copyFileSync(join(CAR_SRC, 'Textures', 'colormap.png'), join(carsOut, 'Textures', 'colormap.png'));
-writeFileSync(join(MODELS, 'manifest.json'), JSON.stringify({ cars: CARS, guns: [] }, null, 2));
-console.log(`cars: copied ${CARS.length} glbs`);
+
+const GUNS = [
+  { file: 'blaster-d.glb', name: 'ar' },
+  { file: 'blaster-b.glb', name: 'smg' },
+  { file: 'blaster-e.glb', name: 'dmr' }
+];
+const GUN_SRC = join(SRC, 'blaster-kit', 'Models', 'GLB format');
+const gunsOut = join(MODELS, 'guns');
+mkdirSync(join(gunsOut, 'Textures'), { recursive: true });
+for (const gun of GUNS) {
+  copyFileSync(join(GUN_SRC, gun.file), join(gunsOut, `${gun.name}.glb`));
+}
+copyFileSync(join(GUN_SRC, 'Textures', 'colormap.png'), join(gunsOut, 'Textures', 'colormap.png'));
+
+const io = new NodeIO();
+const glbs = [...CARS.map((c) => join(carsOut, `${c}.glb`)), ...GUNS.map((g) => join(gunsOut, `${g.name}.glb`))];
+let bytesBefore = 0;
+let bytesAfter = 0;
+for (const glb of glbs) {
+  bytesBefore += statSync(glb).size;
+  const doc = await io.read(glb);
+  await doc.transform(dedup(), prune());
+  await io.write(glb, doc);
+  bytesAfter += statSync(glb).size;
+}
+console.log(`gltf-transform: dedup+prune ${glbs.length} glbs, ${(bytesBefore / 1e6).toFixed(2)} -> ${(bytesAfter / 1e6).toFixed(2)} MB`);
+
+writeFileSync(join(MODELS, 'manifest.json'), JSON.stringify({ cars: CARS, guns: GUNS.map((g) => g.name) }, null, 2));
+console.log(`cars: copied ${CARS.length} glbs, guns: copied ${GUNS.length} glbs`);
+
+const PARTICLES = join(SRC, 'particle-pack', 'PNG (Transparent)');
+mkdirSync(join(ROOT, 'public', 'tex'), { recursive: true });
+copyFileSync(join(PARTICLES, 'muzzle_01.png'), join(ROOT, 'public', 'tex', 'muzzle.png'));
+copyFileSync(join(PARTICLES, 'light_01.png'), join(ROOT, 'public', 'tex', 'spark.png'));
+console.log('particles: copied muzzle + spark textures');
 console.log('import-assets: done');

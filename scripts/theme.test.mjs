@@ -62,6 +62,26 @@ assert(typeof a.name === 'string' && a.name.length >= 3, 'theme has a readable n
 assert(a.name.includes(' '), `theme name has adjective + noun (got "${a.name}")`);
 assert(a.seed === 1337, 'theme keeps its seed');
 
+assert(a.vibe && typeof a.vibe.baseHue === 'number', 'theme exposes neon vibe');
+assert(JSON.stringify(a.vibe) === JSON.stringify(b.vibe), 'vibe is deterministic per seed');
+assert(JSON.stringify(a.vibe) !== JSON.stringify(c.vibe), 'vibe differs across seeds');
+for (const [key, hex] of [
+  ...a.vibe.neon.map((v, i) => [`neon[${i}]`, v]),
+  ['grass', a.vibe.grass],
+  ['leaves', a.vibe.leaves],
+  ['flash', a.vibe.flash]
+]) {
+  assert(Number.isInteger(hex) && hex >= 0 && hex <= 0xffffff, `vibe.${key} is a 24-bit hex (got ${hex})`);
+}
+const toRgb = (hex) => [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255];
+const [gr, gg, gb] = toRgb(a.vibe.grass);
+assert(gg > gr && gg > gb, 'vibe.grass reads as a green-neon hue');
+for (const hex of a.vibe.neon) {
+  const [r, g, b] = toRgb(hex);
+  assert(Math.max(r, g, b) >= 200 && Math.min(r, g, b) <= 200, 'vibe.neon entries are saturated (neon)');
+}
+assert([a, b, c].every((t) => t.name.includes(' ')), 'all seeds produce named themes');
+
 const nature = new Set([BLOCK.GRASS, BLOCK.DIRT, BLOCK.STONE, BLOCK.LEAVES, BLOCK.WOOD]);
 for (const id of nature) {
   const [r, g, bl] = a.palette[id];

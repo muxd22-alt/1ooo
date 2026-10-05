@@ -10,6 +10,9 @@ export function greedyMesh(voxels, sx, sy, sz, opts = {}) {
   const useAO = !!opts.ao;
   const useSmooth = !!opts.smooth;
   const core = opts.core || null;
+  const cellSplit = !!opts.cellSplit;
+  const displace = opts.displace || null;
+  const offset = opts.offset || [0, 0, 0];
 
   const dims = [sx, sy, sz];
   const positions = [];
@@ -111,12 +114,16 @@ export function greedyMesh(voxels, sx, sy, sz, opts = {}) {
     return AO_LEVELS[s1 && s2 ? 0 : 3 - ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (sc ? 1 : 0))];
   }
 
-  function emitQuad(d, u, v, plane, a, b, w, h, m) {
-    const matId = Math.abs(m);
-    const mat = palette[matId] || PALETTE_FALLBACK;
-    const em = emissive[matId] || NO_EMISSIVE;
-    const dir = m > 0 ? 1 : -1;
+  function pushV(p) {
+    if (displace) {
+      const q = displace(p[0] + offset[0], p[1] + offset[1], p[2] + offset[2]);
+      positions.push(q[0] - offset[0], q[1] - offset[1], q[2] - offset[2]);
+    } else {
+      positions.push(p[0], p[1], p[2]);
+    }
+  }
 
+  function emitCells(d, u, v, plane, a, b, w, h, mat, em, dir) {
     const base = [0, 0, 0];
     base[d] = plane;
     base[u] = a;
@@ -130,7 +137,10 @@ export function greedyMesh(voxels, sx, sy, sz, opts = {}) {
     const pD = [base[0], base[1], base[2]];
     pD[v] += h;
 
-    positions.push(pA[0], pA[1], pA[2], pB[0], pB[1], pB[2], pC[0], pC[1], pC[2], pD[0], pD[1], pD[2]);
+    pushV(pA);
+    pushV(pB);
+    pushV(pC);
+    pushV(pD);
 
     const n = [0, 0, 0];
     n[d] = dir;
@@ -155,6 +165,23 @@ export function greedyMesh(voxels, sx, sy, sz, opts = {}) {
     if (dir > 0) indices.push(o, o + 1, o + 2, o, o + 2, o + 3);
     else indices.push(o, o + 3, o + 2, o, o + 2, o + 1);
     vertCount += 4;
+  }
+
+  function emitQuad(d, u, v, plane, a, b, w, h, m) {
+    const matId = Math.abs(m);
+    const mat = palette[matId] || PALETTE_FALLBACK;
+    const em = emissive[matId] || NO_EMISSIVE;
+    const dir = m > 0 ? 1 : -1;
+
+    if (cellSplit && matId < 32 && (w > 1 || h > 1)) {
+      for (let j = 0; j < h; j++) {
+        for (let i = 0; i < w; i++) {
+          emitCells(d, u, v, plane, a + i, b + j, 1, 1, mat, em, dir);
+        }
+      }
+      return;
+    }
+    emitCells(d, u, v, plane, a, b, w, h, mat, em, dir);
   }
 
   if (useSmooth && vertCount > 0) {

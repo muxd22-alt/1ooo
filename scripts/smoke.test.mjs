@@ -232,6 +232,34 @@ try {
   }
   mark(`traffic fleet online (${traffic.count} cars, ${traffic.moving} moving, ${traffic.parked} parked)`);
 
+  let vm = null;
+  let grass = 0;
+  const vmDeadline = Date.now() + 20000;
+  while (Date.now() < vmDeadline) {
+    const vOut = await cdp.send('Runtime.evaluate', {
+      expression:
+        'JSON.stringify({ vm: window.__engine?.viewmodel?.() ?? null, grass: window.__engine?.grass?.() ?? 0 })',
+      returnByValue: true
+    });
+    try {
+      const parsed = JSON.parse(vOut.result.value);
+      vm = parsed.vm;
+      grass = parsed.grass;
+    } catch {
+      vm = null;
+    }
+    if (vm && vm.loaded >= 3 && grass > 0) break;
+    await sleep(500);
+  }
+  if (!vm || vm.loaded < 3) {
+    throw new Error(`viewmodel did not arm: ${JSON.stringify(vm)}`);
+  }
+  if (!(grass > 0)) {
+    throw new Error(`grass field empty (grass=${grass})`);
+  }
+  mark(`viewmodel armed (${vm.loaded} models, slot ${vm.slot})`);
+  mark(`grass scattered (${grass} tufts)`);
+
   const jumpPre = JSON.parse(
     (
       await cdp.send('Runtime.evaluate', {

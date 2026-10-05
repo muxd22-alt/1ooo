@@ -20,13 +20,19 @@ const SHOTS = [
   { name: 'street-n2', lat: 0.4, lon: 55, yaw: 0, pitch: -0.12, eye: 1.7 },
   { name: 'street-e', lat: 10, lon: 45.4, yaw: -Math.PI / 2, pitch: -0.12, eye: 1.7 },
   { name: 'street-w', lat: 10, lon: 45.4, yaw: Math.PI / 2, pitch: -0.12, eye: 1.7 },
-  { name: 'avenue', lat: 0.4, lon: 12, yaw: 1.6, pitch: -0.08, eye: 1.7 },
+  { name: 'avenue', lat: 0.4, lon: 12, yaw: 1.6, pitch: -0.22, eye: 1.7 },
   { name: 'rooftops', lat: 6, lon: 8, yaw: 0.6, pitch: -0.5, eye: 14 },
   { name: 'car-side', feet: [144.45, 120.37, 59.28], yaw: -1.8, pitch: -0.35 },
   { name: 'car-top', feet: [144.21, 118.76, 54.39], yaw: 0.4, pitch: -1.2 },
-  { name: 'overview', lat: 8, lon: 8, yaw: 0.6, pitch: -0.65, eye: 34 },
-  { name: 'skyline', lat: 6, lon: 6, yaw: 0.9, pitch: -0.3, eye: 52 }
-];
+  { name: 'overview', lat: 8, lon: 8, yaw: 0.6, pitch: -0.85, eye: 30 },
+  { name: 'skyline', lat: 6, lon: 6, yaw: 0.9, pitch: -0.3, eye: 52 },
+  { name: 'flash', lat: 0.4, lon: 10, yaw: 0, pitch: -0.15, eye: 1.7, fire: true },
+  { name: 'menu', lat: 0.4, lon: 10, yaw: 0, pitch: -0.22, eye: 1.7 }
+].filter((s) =>
+  process.env.MENU
+    ? s.name === 'menu'
+    : s.name !== 'menu' && (!process.env.ONLY || s.name === process.env.ONLY)
+);
 
 function killTree(pid) {
   spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
@@ -47,6 +53,7 @@ async function waitForHttp(url, ms) {
 function createCdp(wsUrl) {
   const ws = new WebSocket(wsUrl);
   const pending = new Map();
+  const listeners = new Map();
   let nextId = 1;
   ws.addEventListener('message', (raw) => {
     const msg = JSON.parse(raw.data);
@@ -55,6 +62,8 @@ function createCdp(wsUrl) {
       pending.delete(msg.id);
       if (msg.error) reject(new Error(msg.error.message));
       else resolve(msg.result);
+    } else if (msg.method && listeners.has(msg.method)) {
+      for (const fn of listeners.get(msg.method)) fn(msg.params);
     }
   });
   const ready = new Promise((resolve, reject) => {
@@ -62,6 +71,10 @@ function createCdp(wsUrl) {
     ws.addEventListener('error', reject, { once: true });
   });
   return {
+    on(name, fn) {
+      if (!listeners.has(name)) listeners.set(name, []);
+      listeners.get(name).push(fn);
+    },
     async send(method, params = {}) {
       await ready;
       const id = nextId++;
@@ -115,7 +128,20 @@ try {
   cdp = createCdp(page.webSocketDebuggerUrl);
   await cdp.send('Runtime.enable');
   await cdp.send('Page.enable');
-  await cdp.send('Page.navigate', { url: `http://localhost:${APP_PORT}/?phase=0.25` });
+  cdp.on('Runtime.exceptionThrown', (e) => {
+    const d = e.exceptionDetails || {};
+    console.log(`EXC: ${(d.exception?.description || d.text || '').slice(0, 260)}`);
+  });
+  cdp.on('Runtime.consoleAPICalled', (e) => {
+    if (e.type === 'error' || e.type === 'warning') {
+      console.log(`CON: ${e.args.map((a) => a.value ?? '').join(' ').slice(0, 260)}`);
+    }
+  });
+  const url =
+    `http://localhost:${APP_PORT}/?phase=0.25` +
+    (process.env.MENU ? '' : '&seed=1337') +
+    (process.env.CANARY ? '&canary=1' : '');
+  await cdp.send('Page.navigate', { url });
 
   const deadline = Date.now() + 60000;
   for (;;) {
@@ -147,9 +173,17 @@ try {
     const feet = shot.feet ?? surface(shot.lat, shot.lon, Math.max(0.1, (shot.eye ?? 1.7) - 1.6));
     const cam = await evalJson(cdp, `JSON.stringify(window.__engine.view(${JSON.stringify(feet)}, ${shot.yaw}, ${shot.pitch}))`);
     await sleep(250);
+    if (shot.fire) {
+      await evalJson(cdp, 'window.__engine.shoot(), "ok"');
+      await sleep(22);
+    }
     const png = await cdp.send('Page.captureScreenshot', { format: 'png' });
     const file = path.join(OUT, `${shot.name}.png`);
     writeFileSync(file, Buffer.from(png.data, 'base64'));
+    if (shot.fire) {
+      const dbg = await evalJson(cdp, 'JSON.stringify(window.__engine.viewmodel())').catch(() => null);
+      console.log(`flash debug: ${dbg}`);
+    }
     console.log(`${shot.name}: cam ${cam} -> ${file}`);
   }
 } catch (err) {

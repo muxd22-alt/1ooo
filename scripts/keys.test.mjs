@@ -84,7 +84,7 @@ try {
   cdp = createCdp(page.webSocketDebuggerUrl);
   await cdp.send('Runtime.enable');
   await cdp.send('Page.enable');
-  await cdp.send('Page.navigate', { url: `http://localhost:${APP_PORT}/` });
+  await cdp.send('Page.navigate', { url: `http://localhost:${APP_PORT}/?seed=1337` });
 
   const deadline = Date.now() + 60000;
   for (;;) {

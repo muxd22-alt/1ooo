@@ -1,6 +1,7 @@
 import { PLANET, SUB_SIZE, SUBS, generatePlanet, planetSpawn } from './planet.js';
 import { makeTheme } from './theme.js';
 import { greedyMesh } from './greedyMesher.js';
+import { createDisplace } from './rounding.js';
 import { raycastVoxels, subtractSphereIndexed } from './voxelOps.js';
 
 const S = PLANET.size;
@@ -59,12 +60,21 @@ function subHasVolume(i, j, k) {
 
 function meshSub(i, j, k) {
   const t = performance.now();
+  const displace = createDisplace(
+    store.voxels,
+    S,
+    [PLANET.center, PLANET.center, PLANET.center],
+    PLANET.radius
+  );
   const mesh = greedyMesh(extractSub(i, j, k), HALO, HALO, HALO, {
     palette: store.theme.palette,
     emissive: store.theme.emissive,
     ao: true,
     smooth: true,
-    core: CORE
+    core: CORE,
+    cellSplit: true,
+    offset: [i * SUB - 1, j * SUB - 1, k * SUB - 1],
+    displace
   });
   return {
     i,

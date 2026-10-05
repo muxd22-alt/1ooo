@@ -11,5 +11,9 @@
     "race",
     "truck"
   ],
-  "guns": []
+  "guns": [
+    "ar",
+    "smg",
+    "dmr"
+  ]
 }

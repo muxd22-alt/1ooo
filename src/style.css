@@ -48,3 +48,163 @@ body {
 #hud-help b {
   color: #e8f0fb;
 }
+
+.hidden {
+  display: none !important;
+}
+
+#menu {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 5, 9, 0.78);
+  z-index: 30;
+}
+
+#menu.gone {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.menu-box {
+  min-width: 430px;
+  padding: 30px 38px 34px;
+  background: rgba(7, 9, 15, 0.94);
+  border: 1px solid #ff2fb9;
+  box-shadow: 0 0 24px rgba(255, 47, 185, 0.35), inset 0 0 40px rgba(125, 249, 255, 0.05);
+  text-align: center;
+}
+
+.menu-title {
+  font-size: 46px;
+  letter-spacing: 14px;
+  color: #7df9ff;
+  text-shadow: 0 0 14px rgba(125, 249, 255, 0.85), 0 0 40px rgba(125, 249, 255, 0.4);
+}
+
+.menu-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  letter-spacing: 6px;
+  color: #ff2fb9;
+  text-shadow: 0 0 10px rgba(255, 47, 185, 0.8);
+}
+
+.menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.menu-seed-label {
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: #9fb4cf;
+}
+
+.menu-seed-label b {
+  color: #e8f0fb;
+}
+
+.chip {
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #7df9ff;
+  background: transparent;
+  border: 1px solid rgba(125, 249, 255, 0.55);
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: rgba(125, 249, 255, 0.12);
+  box-shadow: 0 0 10px rgba(125, 249, 255, 0.5);
+}
+
+.loadout {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.card {
+  flex: 1;
+  font: inherit;
+  padding: 12px 14px;
+  background: rgba(14, 18, 28, 0.9);
+  border: 1px solid rgba(125, 249, 255, 0.22);
+  border-radius: 6px;
+  color: #d7e3f4;
+  cursor: pointer;
+}
+
+.card b {
+  display: block;
+  font-size: 17px;
+  letter-spacing: 3px;
+  color: #e8f0fb;
+}
+
+.card .dn {
+  display: block;
+  margin-top: 5px;
+  font-size: 10px;
+  color: #9fb4cf;
+}
+
+.card:hover {
+  border-color: rgba(125, 249, 255, 0.6);
+}
+
+.card.selected {
+  border-color: #7df9ff;
+  box-shadow: 0 0 12px rgba(125, 249, 255, 0.45), inset 0 0 14px rgba(125, 249, 255, 0.08);
+}
+
+.card.selected b {
+  color: #7df9ff;
+}
+
+.pool {
+  min-height: 16px;
+  margin-top: 16px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #9fb4cf;
+}
+
+#menu-play {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 13px 0;
+  font: inherit;
+  font-size: 16px;
+  font-weight: bold;
+  letter-spacing: 8px;
+  color: #05060a;
+  background: #7df9ff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-shadow: none;
+  box-shadow: 0 0 18px rgba(125, 249, 255, 0.55);
+}
+
+#menu-play:hover {
+  background: #aefcff;
+  box-shadow: 0 0 26px rgba(125, 249, 255, 0.85);
+}
+
+#menu-play:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

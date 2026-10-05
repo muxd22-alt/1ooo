@@ -87,10 +87,22 @@ export function makeTheme(seed) {
   const satMuted = 0.08 + rand() * 0.22;
   const litNature = 0.3 + rand() * 0.2;
 
-  const grass = hslToRgb(h1, satNature, litNature + 0.06);
-  const leaves = hslToRgb(h1 + 10, Math.min(1, satNature * 1.1), litNature);
-  const lampHues = [0, 72, 144, 216, 288].map((o) => hslToRgb(h3 + o, 0.85, 0.62));
-  const neon = [hslToRgb(h3, 0.9, 0.6), hslToRgb(h3 + 120, 0.9, 0.6), hslToRgb(h3 + 240, 0.9, 0.6)];
+  const vibeRand = mulberry32((seed ^ 0x51ed270b) >>> 0);
+  const vHue = vibeRand() * 360;
+  const vHue2 = (vHue + 140 + vibeRand() * 80) % 360;
+  const vHue3 = (vHue2 + 140 + vibeRand() * 80) % 360;
+  const grassHue = 96 + vibeRand() * 44;
+
+  const grass = hslToRgb(grassHue, 0.72 + vibeRand() * 0.2, litNature + 0.12);
+  const leaves = hslToRgb(vHue, Math.min(1, satNature * 1.6 + 0.35), litNature + 0.04);
+  const lampHues = [
+    hslToRgb(vHue, 0.9, 0.62),
+    hslToRgb(vHue2, 0.95, 0.6),
+    hslToRgb(vHue3, 0.95, 0.62),
+    hslToRgb(grassHue, 0.9, 0.56),
+    hslToRgb(h3, 0.95, 0.6)
+  ];
+  const neon = [hslToRgb(vHue, 0.95, 0.6), hslToRgb(vHue2, 0.95, 0.6), hslToRgb(vHue3, 0.95, 0.58)];
 
   const palette = {
     [BLOCK.GRASS]: grass,
@@ -141,6 +153,13 @@ export function makeTheme(seed) {
     name,
     palette: { ...PREFAB_COLORS, ...palette },
     emissive: { ...PREFAB_EMISSIVE, ...emissive },
+    vibe: {
+      baseHue: vHue,
+      neon: [toHex(neon[0]), toHex(neon[1]), toHex(neon[2])],
+      grass: toHex(grass),
+      leaves: toHex(leaves),
+      flash: toHex(hslToRgb(vHue3, 1.0, 0.66))
+    },
     sky: toHex(hslToRgb(hSky, 0.3 + rand() * 0.3, 0.58 + rand() * 0.14)),
     skyNight: toHex(hslToRgb(hSky, 0.45, 0.05 + rand() * 0.05)),
     dusk: toHex(hslToRgb(hSky + 30, 0.7, 0.55)),
