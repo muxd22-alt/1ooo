@@ -22,9 +22,14 @@ import { intentFromLogits, directorState } from './ai/director.js';
 import { createCarFleet } from './game/carFleet.js';
 import { createViewmodel } from './game/viewmodel.js';
 import { createGrassField } from './world/grassScatter.js';
+import { createSignals } from './game/signals.js';
+import { createSkyFX } from './world/skyFX.js';
+import { createTracers } from './game/tracers.js';
+import { createNeonGlow } from './game/neonGlow.js';
 
 const canvas = document.getElementById('view');
 const hudStats = document.getElementById('hud-stats');
+const vignetteEl = document.getElementById('vignette');
 hudStats.textContent = 'initializing renderer…';
 
 const params = new URLSearchParams(location.search);
@@ -122,6 +127,10 @@ let lastBuild = null;
 let theme = makeTheme(seed);
 let viewmodel = null;
 let grassField = null;
+let signals = null;
+let skyFX = null;
+let tracers = null;
+let neonGlow = null;
 let voxelsMirror = null;
 let weapon = loadPreset(1, seed);
 let lastShotAt = -Infinity;
@@ -137,6 +146,7 @@ const PLACE_COOLDOWN_MS = 110;
 
 const carry = { items: new Map(), total: 0, selected: 0 };
 const pendingEdits = new Map();
+const pendingTraces = [];
 const toolDir = new THREE.Vector3();
 let toolBusy = false;
 let nextHarvestAt = 0;
@@ -213,9 +223,16 @@ function applyTheme(next) {
   hemiLight.color.setHex(theme.hemiSky);
   hemiLight.groundColor.setHex(theme.hemiGround);
   if (viewmodel) viewmodel.setVibe(theme.vibe);
+  if (tracers) {
+    tracers.dispose();
+    tracers = null;
+  }
+  tracers = createTracers(scene, theme.vibe, seed);
 }
 
 applyTheme(theme);
+
+worker.onerror = (e) => console.error('worker error:', (e && e.message) || String(e));
 
 worker.onmessage = (event) => {
   const msg = event.data;
@@ -247,6 +264,8 @@ worker.onmessage = (event) => {
     if (voxelsMirror && msg.cleared) {
       for (let n = 0; n < msg.cleared.length; n++) voxelsMirror[msg.cleared[n]] = 0;
     }
+    const trace = pendingTraces.shift();
+    if (trace && tracers) tracers.fire(trace.origin, trace.dir, msg.hit ? msg.hit.point : null);
   } else {
     for (const mesh of chunkMeshes.values()) {
       scene.remove(mesh);
@@ -262,6 +281,21 @@ worker.onmessage = (event) => {
       grassField = null;
     }
     grassField = createGrassField(scene, voxelsMirror, theme.vibe.grass, msg.seed);
+    if (signals) {
+      signals.dispose();
+      signals = null;
+    }
+    signals = createSignals(scene, msg.seed);
+    if (skyFX) {
+      skyFX.dispose();
+      skyFX = null;
+    }
+    skyFX = createSkyFX(scene, voxelsMirror, msg.seed);
+    if (neonGlow) {
+      neonGlow.dispose();
+      neonGlow = null;
+    }
+    neonGlow = createNeonGlow(scene, msg.neonSpots, theme.vibe);
   }
 
   for (const chunk of msg.chunks) upsertChunkMesh(chunk);
@@ -300,7 +334,8 @@ const laya = {
   margin: 0,
   latencyMs: 0,
   inferCount: 0,
-  target: directorState('HARVESTER')
+  target: directorState('HARVESTER'),
+  atmo: { neon: 0.7, shaft: 0.7, drama: 0.6, tracer: 0.9 }
 };
 let samplingPaused = false;
 
@@ -500,6 +535,8 @@ function shoot(now) {
 
   const origin = camera.position;
   const dir = camera.getWorldDirection(new THREE.Vector3());
+  pendingTraces.push({ origin: origin.clone(), dir: dir.clone() });
+  if (pendingTraces.length > 24) pendingTraces.shift();
 
   worker.postMessage({
     type: 'shoot',
@@ -563,7 +600,11 @@ window.__engine = {
       ? { loaded: viewmodel.count, slot: viewmodel.slot, debug: viewmodel.debug ? viewmodel.debug() : null }
       : { loaded: 0, slot: 0, debug: null },
   vmPoke: (state) => (viewmodel && viewmodel.poke ? viewmodel.poke(state) : false),
-  grass: () => (grassField ? grassField.count : 0),
+    grass: () => (grassField ? grassField.count : 0),
+    signals: () => (signals ? { count: signals.count, first: signals.debug() } : null),
+    sky: () => (skyFX ? { clouds: skyFX.cloudCount, shafts: skyFX.shaftCount } : null),
+    tracers: () => (tracers ? { count: tracers.count, ...tracers.debug() } : null),
+    glow: () => (neonGlow ? neonGlow.count : 0),
   sceneStats: () => {
     let nodes = 0;
     let instanced = 0;
@@ -579,7 +620,8 @@ window.__engine = {
     intent: laya.intent,
     logits: laya.logits,
     latencyMs: laya.latencyMs,
-    inferCount: laya.inferCount
+    inferCount: laya.inferCount,
+    atmo: { ...laya.atmo }
   }),
   inferSample: async (features) => {
     samplingPaused = true;
@@ -752,9 +794,14 @@ function applyAtmosphere(dt, now) {
   const dn = dayNight(now);
   const t = 1 - Math.exp(-1.6 * dt);
   const target = laya.target;
+  const atmo = laya.atmo;
+  atmo.neon += (target.neon - atmo.neon) * t;
+  atmo.shaft += (target.shaft - atmo.shaft) * t;
+  atmo.drama += (target.drama - atmo.drama) * t;
+  atmo.tracer += (target.tracer - atmo.tracer) * t;
 
   layaSkyColor.setHex(target.sky);
-  const sky = skyBlend.lerp(layaSkyColor, 0.35);
+  const sky = skyBlend.lerp(layaSkyColor, 0.35 * (1 - dn.night * 0.8));
 
   scene.fog.density += (target.fog * (1 + 0.5 * dn.night) - scene.fog.density) * t;
   scene.fog.color.lerp(sky, t);
@@ -762,8 +809,10 @@ function applyAtmosphere(dt, now) {
   sun.intensity += (dn.sunIntensity * (target.sun / 3.0) - sun.intensity) * t;
   sun.color.lerp(dn.sunColor, t);
   sun.position.lerp(dn.sunPos, t);
-  hemiLight.intensity += (dn.hemi * (target.hemi / 1.4) - hemiLight.intensity) * t;
-  chunkMaterial.nightGlow.value += (0.15 + 0.85 * dn.night - chunkMaterial.nightGlow.value) * t;
+  const dramaDim = 1 - 0.22 * atmo.drama * (0.4 + 0.6 * dn.night);
+  hemiLight.intensity += (dn.hemi * (target.hemi / 1.4) * dramaDim - hemiLight.intensity) * t;
+  const glowTarget = (0.15 + 0.85 * dn.night) * (0.72 + 0.55 * atmo.neon);
+  chunkMaterial.nightGlow.value += (glowTarget - chunkMaterial.nightGlow.value) * t;
 
   return dn;
 }
@@ -782,13 +831,18 @@ renderer.setAnimationLoop((now) => {
 
   controls.update(dt);
   if (carFleet) carFleet.update(dt);
+  if (signals) signals.update(now);
   if (viewmodel) viewmodel.update(dt);
   pollTools(now);
   const dn = applyAtmosphere(dt, now);
+  if (skyFX) skyFX.update(dt, now, sun.position, dn, laya.atmo);
+  if (tracers) tracers.update(now, camera.position, laya.atmo);
+  if (neonGlow) neonGlow.update(dt, dn.night, laya.atmo);
   renderer.render(scene, camera);
 
   if (now - lastHud > 200) {
     lastHud = now;
+    if (vignetteEl) vignetteEl.style.opacity = (laya.atmo.drama * (0.32 + 0.5 * dn.night)).toFixed(2);
     const clock = clockFromPhase(dn.phase) + (dn.night > 0.5 ? ' night' : dn.night > 0.1 ? ' dusk' : '');
     const build = lastBuild
       ? `seed ${lastBuild.seed} · ${lastBuild.themeName} · ${clock} · gen ${lastBuild.genMs.toFixed(1)}ms · ` +

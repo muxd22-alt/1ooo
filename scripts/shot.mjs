@@ -27,12 +27,15 @@ const SHOTS = [
   { name: 'overview', lat: 8, lon: 8, yaw: 0.6, pitch: -0.85, eye: 30 },
   { name: 'skyline', lat: 6, lon: 6, yaw: 0.9, pitch: -0.3, eye: 52 },
   { name: 'flash', lat: 0.4, lon: 10, yaw: 0, pitch: -0.15, eye: 1.7, fire: true },
+  { name: 'tracer', lat: 0.4, lon: 10, yaw: 0, pitch: 0.28, eye: 1.7, fire: true, tracer: true },
+  { name: 'signals', lat: -2.6, lon: 6.355, yaw: 0, pitch: -0.08, eye: 1.7 },
+  { name: 'clouds', lat: 6, lon: 6, yaw: 0.9, pitch: 0.3, eye: 14 },
   { name: 'menu', lat: 0.4, lon: 10, yaw: 0, pitch: -0.22, eye: 1.7 }
-].filter((s) =>
-  process.env.MENU
-    ? s.name === 'menu'
-    : s.name !== 'menu' && (!process.env.ONLY || s.name === process.env.ONLY)
-);
+].filter((s) => {
+  if (process.env.MENU) return s.name === 'menu';
+  if (process.env.NIGHT) return ['signals', 'rooftops', 'avenue'].includes(s.name);
+  return s.name !== 'menu' && (!process.env.ONLY || s.name === process.env.ONLY);
+});
 
 function killTree(pid) {
   spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
@@ -138,9 +141,10 @@ try {
     }
   });
   const url =
-    `http://localhost:${APP_PORT}/?phase=0.25` +
+    `http://localhost:${APP_PORT}/?phase=${process.env.NIGHT ? '0.75' : '0.25'}` +
     (process.env.MENU ? '' : '&seed=1337') +
-    (process.env.CANARY ? '&canary=1' : '');
+    (process.env.CANARY ? '&canary=1' : '') +
+    '&flashhold=450&tracerhold=1500';
   await cdp.send('Page.navigate', { url });
 
   const deadline = Date.now() + 60000;
@@ -169,13 +173,26 @@ try {
   }
   console.log(`traffic: ${JSON.stringify(traffic)}`);
 
+  const sig = await evalJson(cdp, 'JSON.stringify(window.__engine?.signals?.() ?? null)').catch(() => null);
+  console.log(`signals: ${sig}`);
+
+  const atmo = await evalJson(
+    cdp,
+    "JSON.stringify({ vig: document.getElementById('vignette')?.style.opacity, atmo: window.__engine?.laya?.()?.atmo, tr: window.__engine?.tracers?.(), st: window.__engine?.stats?.() })"
+  ).catch(() => null);
+  console.log(`atmo: ${atmo}`);
+
   for (const shot of SHOTS) {
     const feet = shot.feet ?? surface(shot.lat, shot.lon, Math.max(0.1, (shot.eye ?? 1.7) - 1.6));
     const cam = await evalJson(cdp, `JSON.stringify(window.__engine.view(${JSON.stringify(feet)}, ${shot.yaw}, ${shot.pitch}))`);
     await sleep(250);
     if (shot.fire) {
       await evalJson(cdp, 'window.__engine.shoot(), "ok"');
-      await sleep(22);
+      await sleep(shot.tracer ? 150 : 22);
+    }
+    if (shot.tracer) {
+      const pre = await evalJson(cdp, 'JSON.stringify(window.__engine?.tracers?.())').catch(() => null);
+      console.log(`tracer pre-capture: ${pre}`);
     }
     const png = await cdp.send('Page.captureScreenshot', { format: 'png' });
     const file = path.join(OUT, `${shot.name}.png`);
@@ -186,6 +203,12 @@ try {
     }
     console.log(`${shot.name}: cam ${cam} -> ${file}`);
   }
+
+  const after = await evalJson(
+    cdp,
+    "JSON.stringify({ tr: window.__engine?.tracers?.(), st: window.__engine?.stats?.() })"
+  ).catch(() => null);
+  console.log(`after: ${after}`);
 } catch (err) {
   console.error(`FAIL: ${err.message}`);
   process.exitCode = 1;

@@ -53,6 +53,15 @@ body {
   display: none !important;
 }
 
+#vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.62) 100%);
+}
+
 #menu {
   position: fixed;
   inset: 0;

@@ -1,4 +1,5 @@
 import { PLANET, SUB_SIZE, SUBS, generatePlanet, planetSpawn } from './planet.js';
+import { BLOCK } from './blocks.js';
 import { makeTheme } from './theme.js';
 import { greedyMesh } from './greedyMesher.js';
 import { createDisplace } from './rounding.js';
@@ -124,6 +125,40 @@ function postBuilt(payload, extraTransfer = []) {
   self.postMessage(payload, transfer);
 }
 
+function collectNeonSpots(voxels) {
+  const bins = new Map();
+  for (let z = 0; z < S; z++) {
+    for (let y = 0; y < S; y++) {
+      const row = S * (y + S * z);
+      for (let x = 0; x < S; x++) {
+        const v = voxels[x + row];
+        if (v < BLOCK.NEON_PINK || v > BLOCK.NEON_AMBER) continue;
+        const key = ((x >> 4) << 8) | ((y >> 4) << 4) | (z >> 4);
+        let bin = bins.get(key);
+        if (!bin) {
+          bin = { n: 0, sx: 0, sy: 0, sz: 0, c: [0, 0, 0] };
+          bins.set(key, bin);
+        }
+        bin.n++;
+        bin.sx += x + 0.5;
+        bin.sy += y + 0.5;
+        bin.sz += z + 0.5;
+        bin.c[v - BLOCK.NEON_PINK]++;
+      }
+    }
+  }
+  const out = [];
+  for (const bin of bins.values()) {
+    if (bin.n < 3) continue;
+    let ci = 0;
+    if (bin.c[1] > bin.c[ci]) ci = 1;
+    if (bin.c[2] > bin.c[ci]) ci = 2;
+    out.push({ n: bin.n, x: bin.sx / bin.n, y: bin.sy / bin.n, z: bin.sz / bin.n, c: ci });
+  }
+  out.sort((a, b) => b.n - a.n);
+  return out.slice(0, 8).map((s) => [s.x, s.y, s.z, s.c]);
+}
+
 self.onmessage = (event) => {
   const msg = event.data;
 
@@ -134,6 +169,7 @@ self.onmessage = (event) => {
     store.theme = makeTheme(store.seed);
     store.spawn = planetSpawn();
     const t1 = performance.now();
+    const neonSpots = collectNeonSpots(store.voxels);
 
     const chunks = [];
     let quads = 0;
@@ -163,6 +199,7 @@ self.onmessage = (event) => {
         spawn: store.spawn,
         theme: store.theme,
         voxels: store.voxels,
+        neonSpots,
         chunks,
         stats: { genMs: t1 - t0, meshMs: t2 - t1, quads, faces, verts }
       },

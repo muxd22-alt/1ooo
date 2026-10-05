@@ -23,7 +23,14 @@ Live build: https://muxd22-alt.github.io/1ooo/
 * **CSG Voxel Destruction:** Real-time spherical voxel subtraction (`subtractSphere`) driven by DDA raycasting over the full world — shots carve craters and re-mesh only the affected chunks in the worker.
 * **Modular Gunsmith System:** 4-slot weapon assembly framework (Receiver, Barrel, Grip, Magazine) with deterministic attribute aggregation, weight clamping, and recoil impulse vector scaling. 10 parts, 28/36 valid assemblies, JSON-Schema validated.
 * **Laya ONNX Edge AI (Web Worker):** Executes a quantized INT8 neural network (`onnxruntime-web` over WASM) off-thread to analyze 10 Hz player telemetry vectors (aim sigma, APM, movement variance) into tactical logits — AGGRESSIVE / HARVESTER / CAMPER — driving atmosphere and director state.
-* **Deterministic Seeding:** Planet generation and its color theme are seeded (`?seed=1337` or `R` to reseed) and reproducible across client and CI (reference-tested mesher output).
+* **Deterministic Seeding:** Planet generation and its color theme are seeded (`?seed=1337` or `R` to reseed) and reproducible across client and CI (reference-tested mesher output). Without a `?seed=` parameter the game draws a crypto-random seed and opens a neon boot menu (reroll, weapon pick, deploy); with `?seed=` it boots straight into the world.
+* **First-Person Viewmodel:** GLB gun models (AR / SMG / DMR) with recoil sway, kick animation, sparkle eject and a star-shaped muzzle flash with a brief muzzle light — all themed per-seed by the vibe palette.
+* **Rounded Terrain & Raised Sidewalks:** Voxel columns are radially smoothed with a 512³ direction key, quantized radial scale memo and a smoothstep sidewalk rise (~0.33 m above the road with a 0.7 m fade), so streets read as sidewalks + curbs instead of boxes at eye level.
+* **Scattered Grass:** Seeded grass tufts (`grassScatter.js`) instanced along walkable ground, tinted from the theme nature palette.
+* **Seeded Traffic Signals:** 48 signal poles at the 24 intersections, each intersection phase derived from the seed hash with a 7.6 s green/amber/red cycle per axis.
+* **Blocky Clouds & Light Shafts:** A drifting field of flat-white blocky cloud clusters acts as the visible light source for 9 sun shafts and 9 ground light pools anchored to the surface.
+* **Seed-Color Tracers & Muzzle Physics Feel:** Each shot fires a pooled tracer tinted from the seed's neon palette with per-shot jitter, fading over its lifetime.
+* **Laya Atmosphere Driver:** The ONNX director's intents now steer `neon / shaft / drama / tracer` atmosphere scalars on top of fog/sky/sun — `drama` also drives a cinematic vignette, and night amplifies neon glow and emissive spill pools.
 
 ---
 
@@ -108,6 +115,9 @@ npm run diag
 
 # Validate production build
 npm run build
+
+# Capture the visual regression screenshot suite (14 day shots; MENU=1 for the boot menu, NIGHT=1 for the night trio, ONLY=<name> for one shot)
+node scripts/shot.mjs
 
 # Regenerate the Laya ONNX model + reference logits (needs Python + onnx/onnxruntime)
 npm run gen:model
