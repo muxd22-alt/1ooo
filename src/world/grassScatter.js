@@ -81,7 +81,7 @@ function bladeGeometry() {
     const base = q * 4;
     positions.push(-ox, 0, -oz, ox, 0, oz, ox, 0.42, oz, -ox, 0.42, -oz);
     for (let k = 0; k < 4; k++) normals.push(0, 1, 0);
-    colors.push(0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 1, 1, 1, 1, 1, 1);
+    colors.push(0.62, 0.62, 0.62, 0.62, 0.62, 0.62, 1, 1, 1, 1, 1, 1);
     indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
