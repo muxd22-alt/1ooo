@@ -14,6 +14,7 @@ import {
   mix,
   mod,
   mx_noise_float,
+  normalWorld,
   positionWorld,
   round,
   smoothstep,
@@ -102,7 +103,7 @@ export function createChunkMaterial() {
   const C = float(PLANET.center);
   const rel = positionWorld.sub(vec3(C));
   const rad = length(rel);
-  const an = abs(rel.div(rad));
+  const an = abs(normalWorld);
   const wsum = an.x.add(an.y).add(an.z);
   const wx = an.x.div(wsum);
   const wy = an.y.div(wsum);
