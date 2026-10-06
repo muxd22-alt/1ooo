@@ -6,6 +6,9 @@ import {
   atan,
   clamp,
   cos,
+  cross,
+  dFdx,
+  dFdy,
   float,
   fwidth,
   length,
@@ -14,8 +17,9 @@ import {
   mix,
   mod,
   mx_noise_float,
-  normalWorld,
+  normalize,
   positionWorld,
+  pow4,
   round,
   smoothstep,
   uniform,
@@ -103,7 +107,8 @@ export function createChunkMaterial() {
   const C = float(PLANET.center);
   const rel = positionWorld.sub(vec3(C));
   const rad = length(rel);
-  const an = abs(normalWorld);
+  const flatN = normalize(cross(dFdx(positionWorld), dFdy(positionWorld)));
+  const an = pow4(abs(flatN));
   const wsum = an.x.add(an.y).add(an.z);
   const wx = an.x.div(wsum);
   const wy = an.y.div(wsum);
