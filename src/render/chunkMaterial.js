@@ -22,16 +22,13 @@ import {
 } from 'three/tsl';
 import { PLANET, ROAD_HALF, WALK_HALF, CITY_MAX_LAT } from '../world/planet.js';
 
-function roadPaint(albedo, env, uRoad, uLine) {
-  const C = float(PLANET.center);
+function roadPaint(albedo, env, uRoad, uLine, rel, rad) {
   const Rf = float(PLANET.radius);
   const HALF = float(ROAD_HALF);
   const WALK = float(WALK_HALF);
   const P = float(Math.PI / 4);
   const CITY = float(CITY_MAX_LAT * (Math.PI / 180));
 
-  const rel = positionWorld.sub(vec3(C));
-  const rad = length(rel);
   const lat = asin(clamp(rel.y.div(rad), -1.0, 1.0));
   const lon = atan(rel.z, rel.x);
   const cosLat = cos(lat);
@@ -102,15 +99,30 @@ export function createChunkMaterial() {
   const height = clamp(positionWorld.y.sub(float(PLANET.center - PLANET.radius)).div(span), 0.0, 1.0);
   const skyTint = mix(vec3(0.86, 0.91, 1.0), vec3(1.08, 1.03, 0.94), height);
 
-  const mottle = mx_noise_float(positionWorld.mul(0.55)).mul(0.055);
-  const grain = mx_noise_float(positionWorld.mul(7.0)).mul(0.02);
+  const C = float(PLANET.center);
+  const rel = positionWorld.sub(vec3(C));
+  const rad = length(rel);
+  const an = abs(rel.div(rad));
+  const wsum = an.x.add(an.y).add(an.z);
+  const wx = an.x.div(wsum);
+  const wy = an.y.div(wsum);
+  const wz = an.z.div(wsum);
+  const tri = (scale, o1, o2, o3) => {
+    const p = rel.mul(scale);
+    return mx_noise_float(vec3(p.y, p.z, float(o1)))
+      .mul(wx)
+      .add(mx_noise_float(vec3(p.x, p.z, float(o2))).mul(wy))
+      .add(mx_noise_float(vec3(p.x, p.y, float(o3))).mul(wz));
+  };
+  const mottle = tri(0.55, 11.3, 47.7, 83.1).mul(0.055);
+  const grain = tri(7.0, 5.9, 29.4, 61.8).mul(0.02);
   const detail = float(1.0).add(mottle).add(grain);
   const env = skyTint.mul(detail);
 
   const uRoad = uniform(new Vector3(0.15, 0.15, 0.16));
   const uLine = uniform(new Vector3(0.92, 0.86, 0.42));
 
-  material.colorNode = roadPaint(albedo, env, uRoad, uLine);
+  material.colorNode = roadPaint(albedo, env, uRoad, uLine, rel, rad);
 
   const nightGlow = uniform(0.15);
   material.emissiveNode = attribute('emissive', 'vec3').mul(nightGlow);
